@@ -1,0 +1,26 @@
+# Terraform
+*.tfstate
+*.tfstate.*.backup
+*.tfvars
+!terraform.tfvars.example
+
+# Ansible
+*.retry
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets / sensitive
+*.pem
+*.key
+.env
+*secret.yml
+
+# Logs
+*.log
+
+# Everything in docker not compose.yaml or .env.example
+/docker/**
+!/docker/**/compose.yaml
+!/docker/**/.env.example

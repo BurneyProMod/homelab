@@ -1,0 +1,28 @@
+---
+- name: Install k3s server
+  shell: |
+    INSTALL_K3S_VERSION={{ k3s_version }} curl -sfL https://get.k3s.io | sh -s - server \
+      --write-kubeconfig-mode 644 \
+      --disable traefik \
+      --disable servicelb \
+      --node-name {{ inventory_hostname }}
+  args:
+    creates: /usr/local/bin/k3s
+
+- name: Wait for k3s to be ready
+  command: k3s kubectl get nodes
+  register: k3s_ready
+  retries: 12
+  delay: 10
+  until: k3s_ready.rc == 0
+
+- name: Get node token
+  slurp:
+    src: /var/lib/rancher/k3s/server/node-token
+  register: k3s_token
+  run_once: true
+
+- name: Store token as fact
+  set_fact:
+    k3s_token: "{{ k3s_token.content | b64decode | trim }}"
+  run_once: true

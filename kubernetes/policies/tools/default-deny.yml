@@ -1,0 +1,11 @@
+# Default deny all ingress traffic in tools namespace.
+# Once applied, only traffic explicitly allowed by other NetworkPolicies is permitted.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: tools
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress

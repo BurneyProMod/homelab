@@ -1,0 +1,25 @@
+- job_name: 'host_ping'
+  metrics_path: /probe
+  params:
+    module: [icmp]
+  static_configs:
+    - targets:
+        - 192.168.1.1
+        - 192.168.1.50
+        - 192.168.1.30
+        - 192.168.1.31
+        - 192.168.1.32
+        - 192.168.1.11
+      labels:
+        group: homelab
+  relabel_configs:
+    - source_labels: [__address__]
+      target_label: __param_target
+    - source_labels: [__param_target]
+      target_label: instance
+    - target_label: __address__
+      replacement: blackbox-exporter.monitoring.svc.cluster.local:9115
+- job_name: 'opnsense'
+  static_configs:
+    - targets:
+      - 192.168.1.1:9273

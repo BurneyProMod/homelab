@@ -1,0 +1,11 @@
+# Default deny all ingress traffic in monitoring namespace.
+# Egress is intentionally unrestricted for DNS, metrics export, and API calls.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: monitoring
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress

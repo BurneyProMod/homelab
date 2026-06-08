@@ -1,0 +1,156 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: homepage-config-pv
+spec:
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteMany
+  nfs:
+    server: 192.168.1.11
+    path: /volume1/homelab/k8s/homepage/config
+  persistentVolumeReclaimPolicy: Retain
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: homepage-images-pv
+spec:
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteMany
+  nfs:
+    server: 192.168.1.11
+    path: /volume1/homelab/k8s/homepage/images
+  persistentVolumeReclaimPolicy: Retain
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: homepage-config
+  namespace: tools
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: ""
+  volumeName: homepage-config-pv
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: homepage-images
+  namespace: tools
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: ""
+  volumeName: homepage-images-pv
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: homepage
+  namespace: tools
+spec:
+  replicas: 1
+  strategy:
+    # Not Recreate to avoid pod deletion after updating config
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      app: homepage
+  template:
+    metadata:
+      labels:
+        app: homepage
+    spec:
+      serviceAccountName: homepage
+      automountServiceAccountToken: true
+      containers:
+      - name: homepage
+        image: ghcr.io/gethomepage/homepage:v0.10.9
+        ports:
+        - containerPort: 3000
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 3000
+          initialDelaySeconds: 10
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 3000
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi
+        env:
+        - name: PUID
+          value: '1000'
+        - name: PGID
+          value: '1000'
+        - name: HOMEPAGE_ALLOWED_HOSTS
+          value: home.homelab.lan
+        volumeMounts:
+        - name: config
+          mountPath: /app/config
+        - name: images
+          mountPath: /app/public/images
+      volumes:
+      - name: config
+        persistentVolumeClaim:
+          claimName: homepage-config
+      - name: images
+        persistentVolumeClaim:
+          claimName: homepage-images
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: homepage-svc
+  namespace: tools
+spec:
+  selector:
+    app: homepage
+  ports:
+  - port: 80
+    targetPort: 3000
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: homepage
+  namespace: tools
+  annotations:
+    cert-manager.io/cluster-issuer: homelab-ca-issuer
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: home.homelab.lan
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: homepage-svc
+            port:
+              number: 80
+  tls:
+  - hosts:
+    - home.homelab.lan
+    secretName: homepage-tls

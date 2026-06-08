@@ -1,0 +1,84 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: omni-tools
+  namespace: tools
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: omni-tools
+  template:
+    metadata:
+      labels:
+        app: omni-tools
+    spec:
+      containers:
+      - name: omni-tools
+        image: iib0011/omni-tools:0.6.0
+        ports:
+        - containerPort: 80
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 10
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 300m
+            memory: 256Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: omni-tools-svc
+  namespace: tools
+spec:
+  selector:
+    app: omni-tools
+  ports:
+  - port: 80
+    targetPort: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: omni-tools
+  namespace: tools
+  annotations:
+    gethomepage.dev/enabled: 'true'
+    gethomepage.dev/name: Omni Tools
+    gethomepage.dev/group: Tools
+    gethomepage.dev/icon: tools.png
+    gethomepage.dev/description: Web utility toolbox
+    gethomepage.dev/siteMonitor: http://omni-tools-svc.tools.svc.cluster.local
+    gethomepage.dev/app: omni-tools
+    gethomepage.dev/pod-selector: ''
+    cert-manager.io/cluster-issuer: homelab-ca-issuer
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: omni.homelab.lan
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: omni-tools-svc
+            port:
+              number: 80
+  tls:
+  - hosts:
+    - omni.homelab.lan
+    secretName: omni-tls

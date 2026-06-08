@@ -1,0 +1,5 @@
+proxmox_endpoint     = "https://<proxmox-ip>:8006"
+proxmox_api_token    = "<user>@pve!<token-name>=<secret>"
+ssh_public_key       = "ssh-ed25519 AAAAC3..."
+vm_gateway           = "192.168.1.1"
+proxmox_tls_insecure = false

@@ -1,0 +1,22 @@
+# ansible-playbook -i ansible/inventory/hosts.ini ansible/pve-nag-buster.yml
+---
+- name: Install pve-nag-buster on Proxmox hosts
+  hosts: proxmox
+  become: no
+  tasks:
+    - name: Install git
+      apt:
+        name: git
+        state: present
+        update_cache: yes
+
+    - name: Clone pve-nag-buster
+      git:
+        repo: https://github.com/foundObjects/pve-nag-buster.git
+        dest: /root/pve-nag-buster
+        version: v04
+
+    - name: Run pve-nag-buster installer (idempotent)
+      command: /root/pve-nag-buster/install.sh
+      args:
+        creates: /etc/systemd/system/pve-nag-buster.service

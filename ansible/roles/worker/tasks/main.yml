@@ -1,0 +1,9 @@
+---
+- name: Install k3s agent
+  shell: |
+    INSTALL_K3S_VERSION={{ k3s_version }} curl -sfL https://get.k3s.io | sh -s - agent \
+      --server https://{{ hostvars[groups[cp_group][0]].ansible_host }}:6443 \
+      --token {{ hostvars[groups[cp_group][0]].k3s_token }} \
+      --node-name {{ inventory_hostname }}
+  args:
+    creates: /usr/local/bin/k3s-agent

@@ -1,0 +1,359 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: immich-upload-pv
+spec:
+  capacity:
+    storage: 200Gi
+  accessModes:
+  - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: immich-upload-manual
+  nfs:
+    server: 192.168.1.11
+    path: /volume1/immich
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: immich-upload-data
+  namespace: tools
+spec:
+  accessModes:
+  - ReadWriteMany
+  storageClassName: immich-upload-manual
+  volumeName: immich-upload-pv
+  resources:
+    requests:
+      storage: 200Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: immich-model-cache
+  namespace: tools
+spec:
+  accessModes:
+  - ReadWriteOnce
+  storageClassName: nfs
+  resources:
+    requests:
+      storage: 20Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: immich-postgres-data
+  namespace: tools
+spec:
+  accessModes:
+  - ReadWriteOnce
+  storageClassName: proxmox-local
+  resources:
+    requests:
+      storage: 100Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: immich-postgres
+  namespace: tools
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: immich-postgres
+  template:
+    metadata:
+      labels:
+        app: immich-postgres
+    spec:
+      containers:
+      - name: postgres
+        image: tensorchord/pgvecto-rs:pg14-v0.2.0
+        ports:
+        - containerPort: 5432
+        env:
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: immich-secret
+              key: DB_USERNAME
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: immich-secret
+              key: DB_PASSWORD
+        - name: POSTGRES_DB
+          valueFrom:
+            secretKeyRef:
+              name: immich-secret
+              key: DB_DATABASE_NAME
+        - name: PGDATA
+          value: /var/lib/postgresql/data/pgdata
+        livenessProbe:
+          tcpSocket:
+            port: 5432
+          initialDelaySeconds: 20
+          periodSeconds: 30
+        readinessProbe:
+          tcpSocket:
+            port: 5432
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        resources:
+          requests:
+            cpu: 100m
+            memory: 512Mi
+          limits:
+            cpu: 1000m
+            memory: 2Gi
+        volumeMounts:
+        - name: postgres-data
+          mountPath: /var/lib/postgresql/data
+      volumes:
+      - name: postgres-data
+        persistentVolumeClaim:
+          claimName: immich-postgres-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: immich-postgres-svc
+  namespace: tools
+spec:
+  selector:
+    app: immich-postgres
+  ports:
+  - port: 5432
+    targetPort: 5432
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: immich-redis
+  namespace: tools
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: immich-redis
+  template:
+    metadata:
+      labels:
+        app: immich-redis
+    spec:
+      containers:
+      - name: redis
+        image: redis:6.2-alpine
+        ports:
+        - containerPort: 6379
+        livenessProbe:
+          tcpSocket:
+            port: 6379
+          initialDelaySeconds: 10
+          periodSeconds: 30
+        readinessProbe:
+          tcpSocket:
+            port: 6379
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 300m
+            memory: 256Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: immich-redis-svc
+  namespace: tools
+spec:
+  selector:
+    app: immich-redis
+  ports:
+  - port: 6379
+    targetPort: 6379
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: immich-machine-learning
+  namespace: tools
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: immich-machine-learning
+  template:
+    metadata:
+      labels:
+        app: immich-machine-learning
+    spec:
+      containers:
+      - name: machine-learning
+        image: ghcr.io/immich-app/immich-machine-learning:v2.7.5
+        ports:
+        - containerPort: 3003
+        env:
+        - name: TZ
+          value: America/Chicago
+        livenessProbe:
+          tcpSocket:
+            port: 3003
+          initialDelaySeconds: 20
+          periodSeconds: 30
+        readinessProbe:
+          tcpSocket:
+            port: 3003
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        resources:
+          requests:
+            cpu: 200m
+            memory: 512Mi
+          limits:
+            cpu: 2000m
+            memory: 4Gi
+        volumeMounts:
+        - name: model-cache
+          mountPath: /cache
+      volumes:
+      - name: model-cache
+        persistentVolumeClaim:
+          claimName: immich-model-cache
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: immich-ml-svc
+  namespace: tools
+spec:
+  selector:
+    app: immich-machine-learning
+  ports:
+  - port: 3003
+    targetPort: 3003
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: immich-server
+  namespace: tools
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: immich-server
+  template:
+    metadata:
+      labels:
+        app: immich-server
+    spec:
+      containers:
+      - name: immich-server
+        image: ghcr.io/immich-app/immich-server:v2.7.5
+        ports:
+        - containerPort: 2283
+        env:
+        - name: TZ
+          value: America/Chicago
+        - name: DB_HOSTNAME
+          value: immich-postgres-svc
+        - name: DB_PORT
+          value: '5432'
+        - name: DB_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: immich-secret
+              key: DB_USERNAME
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: immich-secret
+              key: DB_PASSWORD
+        - name: DB_DATABASE_NAME
+          valueFrom:
+            secretKeyRef:
+              name: immich-secret
+              key: DB_DATABASE_NAME
+        - name: REDIS_HOSTNAME
+          value: immich-redis-svc
+        - name: REDIS_PORT
+          value: '6379'
+        - name: IMMICH_MACHINE_LEARNING_URL
+          value: http://immich-ml-svc:3003
+        livenessProbe:
+          tcpSocket:
+            port: 2283
+          initialDelaySeconds: 30
+          periodSeconds: 30
+        readinessProbe:
+          tcpSocket:
+            port: 2283
+          initialDelaySeconds: 15
+          periodSeconds: 10
+        resources:
+          requests:
+            cpu: 300m
+            memory: 1Gi
+          limits:
+            cpu: 2000m
+            memory: 4Gi
+        volumeMounts:
+        - name: upload-data
+          mountPath: /usr/src/app/upload
+      volumes:
+      - name: upload-data
+        persistentVolumeClaim:
+          claimName: immich-upload-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: immich-svc
+  namespace: tools
+spec:
+  selector:
+    app: immich-server
+  ports:
+  - port: 80
+    targetPort: 2283
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: immich
+  namespace: tools
+  annotations:
+    gethomepage.dev/enabled: 'true'
+    gethomepage.dev/name: Immich
+    gethomepage.dev/group: Media
+    gethomepage.dev/icon: immich.png
+    gethomepage.dev/description: Self-hosted photo and video backup
+    gethomepage.dev/siteMonitor: http://immich-svc.tools.svc.cluster.local
+    gethomepage.dev/app: immich-server
+    gethomepage.dev/pod-selector: ''
+    cert-manager.io/cluster-issuer: homelab-ca-issuer
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: immich.homelab.lan
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: immich-svc
+            port:
+              number: 80
+  tls:
+  - hosts:
+    - immich.homelab.lan
+    secretName: immich-tls

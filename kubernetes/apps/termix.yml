@@ -1,0 +1,126 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: termix-data-proxmox
+  namespace: tools
+spec:
+  accessModes:
+  - ReadWriteOnce
+  storageClassName: proxmox-local
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: termix
+  namespace: tools
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: termix
+  template:
+    metadata:
+      labels:
+        app: termix
+    spec:
+      containers:
+      - name: guacd
+        image: guacamole/guacd:1.5.5
+        ports:
+        - containerPort: 4822
+        livenessProbe:
+          tcpSocket:
+            port: 4822
+          initialDelaySeconds: 10
+          periodSeconds: 30
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi
+      - name: termix
+        image: ghcr.io/lukegus/termix:v0.3.0
+        ports:
+        - containerPort: 8081
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 8081
+          initialDelaySeconds: 10
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 8081
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        resources:
+          requests:
+            cpu: 50m
+            memory: 128Mi
+          limits:
+            cpu: 300m
+            memory: 384Mi
+        env:
+        - name: PORT
+          value: '8081'
+        volumeMounts:
+        - name: data
+          mountPath: /app/data
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: termix-data-proxmox
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: termix-svc
+  namespace: tools
+spec:
+  selector:
+    app: termix
+  ports:
+  - port: 80
+    targetPort: 8081
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: termix
+  namespace: tools
+  annotations:
+    gethomepage.dev/enabled: 'true'
+    gethomepage.dev/name: Termix
+    gethomepage.dev/group: Tools
+    gethomepage.dev/icon: terminal.png
+    gethomepage.dev/description: Web terminal manager
+    nginx.ingress.kubernetes.io/proxy-read-timeout: '3600'
+    nginx.ingress.kubernetes.io/proxy-send-timeout: '3600'
+    gethomepage.dev/app: termix
+    gethomepage.dev/pod-selector: ''
+    cert-manager.io/cluster-issuer: homelab-ca-issuer
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: termix.homelab.lan
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: termix-svc
+            port:
+              number: 80
+  tls:
+  - hosts:
+    - termix.homelab.lan
+    secretName: termix-tls
