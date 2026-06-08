@@ -4,9 +4,6 @@ Kubernetes homelab running on Proxmox, provisioned with Terraform + Ansible.
 
 ## Server Inventory
 
-Use this section for the current host list and simple hardware notes.
-Keep the hardware column brief for now; if a machine is a Raspberry Pi, note that explicitly.
-
 | Host | IP | Role | Notes |
 |------|----|------|------------------|
 | proxmox1 | 192.168.1.30 | Hypervisor | Lenovo 3136 |
