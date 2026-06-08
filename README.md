@@ -121,34 +121,7 @@ kubectl apply -f kubernetes/apps/
 kubectl apply -f kubernetes/monitoring/
 ```
 
-### 5. Remove Proxmox Subscription Notice (optional)
-
-```bash
-ansible-playbook -i ansible/inventory/hosts.ini ansible/pve-nag-buster.yml
-```
-
 ## Operations
-
-### Verify Alerting
-
-Prometheus alert rules are deployed via `kubernetes/monitoring/alert-rules.yml`.
-To verify they are loaded and firing:
-
-```bash
-# Check rules are registered
-kubectl get prometheusrule -n monitoring
-
-# View active alerts in Prometheus UI
-open https://prometheus.homelab.lan/alerts
-
-# Trigger a test alert (temporary down)
-kubectl -n monitoring port-forward svc/alertmanager-operated 9093:9093 &
-curl http://localhost:9093/api/v2/alerts
-```
-
-Alertmanager is deployed by kube-prometheus-stack and routes to the default receiver.
-To configure external notifications (email, Slack, etc), update the Alertmanager config
-via the kube-prometheus-stack Helm values.
 
 ### Restore from Backup
 
@@ -178,42 +151,10 @@ kubectl apply -f kubernetes/apps/
 kubectl apply -f kubernetes/monitoring/
 ```
 
-## Storage Classes
+## K8s Storage Classes
 
 | Name | Provisioner | Backend |
 |------|------------|---------|
 | `local-path` | rancher.io/local-path | Node-local storage (default) |
 | `nfs` | nfs-subdir-external-provisioner | Synology NAS (192.168.1.11) |
 | `proxmox-local` | Proxmox CSI plugin | Proxmox local-lvm storage (requires Proxmox CSI driver installed on cluster) |
-
-## Project Structure
-
-```
-├── ansible/                  # Ansible config management
-│   ├── site.yml              # Main entry point
-│   ├── k8s-bootstrap.yml     # K3s cluster bootstrap
-│   ├── pve-nag-buster.yml    # Proxmox license notice removal
-│   ├── inventory/
-│   │   ├── hosts.ini         # Inventory file
-│   │   └── group_vars/       # Group-level variables
-│   └── roles/
-│       ├── common/           # Shared node setup
-│       ├── control_plane/    # K3s server install
-│       └── worker/           # K3s agent install
-├── terraform/                # Infrastructure provisioning
-│   ├── main.tf               # VM definitions
-│   ├── variables.tf          # Input variables
-│   ├── outputs.tf            # Outputs (IPs)
-│   ├── terraform.tfvars      # Secrets (gitignored)
-│   └── modules/vm/           # Reusable VM module
-├── kubernetes/               # K8s manifests
-│   ├── cert-manager/         # TLS certificate setup
-│   ├── namespaces/           # Namespace definitions
-│   ├── policies/             # Network policies
-│   │   ├── tools/            #   Per-namespace policies
-│   │   └── monitoring/
-│   ├── apps/                 # Application deployments
-│   └── monitoring/           # Prometheus rules, Grafana dashboards, Blackbox
-├── scripts/                  # Utility scripts
-└── docs/                     # Documentation & notes
-```
