@@ -4,6 +4,11 @@ services:
   daemon:
     image: ghcr.io/scanopy/scanopy/daemon:latest
     container_name: scanopy-daemon
+    labels:
+      - homepage.group=Docker
+      - homepage.name=Scanopy
+      - homepage.description=Device scan worker and host discovery
+      - homepage.showStats=true
     network_mode: host
     privileged: true
     restart: unless-stopped
@@ -39,6 +44,11 @@ services:
 
   server:
     image: ghcr.io/scanopy/scanopy/server:latest
+    labels:
+      - homepage.group=Docker
+      - homepage.name=Scanopy
+      - homepage.href=http://192.168.1.50:60072
+      - homepage.description=Inventory and device scanning
     ports:
       - "60072:60072"
     environment:

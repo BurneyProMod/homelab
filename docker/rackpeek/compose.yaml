@@ -4,6 +4,11 @@ services:
   rackpeek:
     image: aptacode/rackpeek:latest
     container_name: rackpeek
+    labels:
+      - homepage.group=Docker
+      - homepage.name=RackPeek
+      - homepage.href=http://192.168.1.50:3001
+      - homepage.description=Rack server monitoring dashboard
     ports:
       - "3001:8080"
     volumes:

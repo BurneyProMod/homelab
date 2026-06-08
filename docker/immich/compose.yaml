@@ -12,6 +12,11 @@ services:
   immich-server:
     container_name: immich_server
     image: ghcr.io/immich-app/immich-server:${IMMICH_VERSION:-release}
+    labels:
+      - homepage.group=Docker
+      - homepage.name=Immich
+      - homepage.href=http://192.168.1.50:2283
+      - homepage.description=Photo and video backup
     volumes:
       - ${UPLOAD_LOCATION}:/usr/src/app/upload
       - /etc/localtime:/etc/localtime:ro
