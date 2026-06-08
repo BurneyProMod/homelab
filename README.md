@@ -31,6 +31,8 @@ Kubernetes homelab running on Proxmox, provisioned with Terraform + Ansible.
 | Prometheus | `prometheus.homelab.lan` | Metrics |
 | Grafana | `grafana.homelab.lan` | Dashboards |
 
+Homepage also auto-discovers Docker services from the `docker/*/compose.yaml` stacks through a read-only Docker socket proxy at `192.168.1.50:2375`.
+
 ## Stack
 
 - **Hypervisor**: Proxmox VE
@@ -153,5 +155,5 @@ kubectl apply -f kubernetes/monitoring/
 | Name | Provisioner | Backend |
 |------|------------|---------|
 | `local-path` | rancher.io/local-path | Node-local storage (default) |
-| `nfs` | nfs-subdir-external-provisioner | Synology NAS (192.168.1.11) |
+| `nfs` | nfs-subdir-external-provisioner | Synology NAS |
 | `proxmox-local` | Proxmox CSI plugin | Proxmox local-lvm storage (requires Proxmox CSI driver installed on cluster) |

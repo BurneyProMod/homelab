@@ -1,4 +1,16 @@
 apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: homepage-docker-config
+  namespace: default
+data:
+  docker.yaml: |
+    burndev:
+      host: 192.168.1.50
+      port: 2375
+      protocol: http
+---
+apiVersion: v1
 kind: PersistentVolume
 metadata:
   name: homepage-config-pv
@@ -30,7 +42,7 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: homepage-config
-  namespace: tools
+  namespace: default
 spec:
   accessModes:
     - ReadWriteMany
@@ -44,7 +56,7 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: homepage-images
-  namespace: tools
+  namespace: default
 spec:
   accessModes:
     - ReadWriteMany
@@ -58,11 +70,10 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: homepage
-  namespace: tools
+  namespace: default
 spec:
   replicas: 1
   strategy:
-    # Not Recreate to avoid pod deletion after updating config
     type: RollingUpdate
   selector:
     matchLabels:
@@ -100,9 +111,9 @@ spec:
             memory: 256Mi
         env:
         - name: PUID
-          value: '1000'
+          value: "1000"
         - name: PGID
-          value: '1000'
+          value: "1000"
         - name: HOMEPAGE_ALLOWED_HOSTS
           value: home.homelab.lan
         volumeMounts:
@@ -110,6 +121,10 @@ spec:
           mountPath: /app/config
         - name: images
           mountPath: /app/public/images
+        - name: docker-config
+          mountPath: /app/config/docker.yaml
+          subPath: docker.yaml
+          readOnly: true
       volumes:
       - name: config
         persistentVolumeClaim:
@@ -117,12 +132,15 @@ spec:
       - name: images
         persistentVolumeClaim:
           claimName: homepage-images
+      - name: docker-config
+        configMap:
+          name: homepage-docker-config
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: homepage-svc
-  namespace: tools
+  namespace: default
 spec:
   selector:
     app: homepage
@@ -134,7 +152,7 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: homepage
-  namespace: tools
+  namespace: default
   annotations:
     cert-manager.io/cluster-issuer: homelab-ca-issuer
 spec:

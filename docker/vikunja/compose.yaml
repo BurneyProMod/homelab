@@ -1,6 +1,11 @@
 services:
     vikunja:
         image: vikunja/vikunja:latest
+        labels:
+            - homepage.group=Docker
+            - homepage.name=Vikunja
+            - homepage.href=http://192.168.1.50:3456
+            - homepage.description=Task and project management
         environment:
             VIKUNJA_SERVICE_PUBLICURL: ${VIKUNJA_SERVICE_PUBLICURL}
             VIKUNJA_DATABASE_HOST: ${VIKUNJA_DATABASE_HOST}

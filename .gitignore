@@ -25,3 +25,8 @@ Thumbs.db
 !/docker/**/
 !/docker/**/compose.yaml
 !/docker/**/.env.example
+
+# Everything in config/ not .example files
+/config/**
+!/config/**/
+!/config/**/*.example
