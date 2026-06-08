@@ -22,5 +22,6 @@ Thumbs.db
 
 # Everything in docker not compose.yaml or .env.example
 /docker/**
+!/docker/**/
 !/docker/**/compose.yaml
 !/docker/**/.env.example
