@@ -40,3 +40,5 @@ secrets/homelab.env
 !/config/**/*.example
 !/config/caddy/Caddyfile
 !/config/caddy/README.md
+!/config/step-ca/root_ca.crt
+!/config/step-ca/README.md
