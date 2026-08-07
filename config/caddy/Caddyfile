@@ -3,8 +3,16 @@
 # Fronted by keepalived virtual IP 192.168.1.10. Deployed identically to both nodes.
 # Captured from live configs 2026-08-06:
 #   caddy 116 (pve-exu) *.pve.lan tree, caddy 101 (pve-gpu) *.lan tree, caddy 103 (pve-core) pi.lan
-# Protocol behavior preserved from source (HTTP-only sites stay http://, TLS sites keep tls internal).
+# Protocol behavior preserved from source: HTTP-only sites stay http://. TLS
+# sites (openbao, pi, pve.lan) are issued by the single step-ca "Burney Home CA"
+# (config/step-ca/root_ca.crt). Caddy validates via tls-alpn-01 on :443, which
+# needs DNS to point those names at the VIP (done 2026-08-06).
 # NEW: pve.lan -> Proxmox web UI (goal: all PVE services behind one front IP).
+
+{
+	acme_ca https://192.168.1.43:443/acme/acme/directory
+	acme_ca_root /etc/caddy/root_ca.crt
+}
 
 # --- *.pve.lan tree (formerly caddy 116, pve-exu) ---
 
@@ -52,9 +60,8 @@ http://omni.pve.lan {
 	reverse_proxy 192.168.1.71:30084
 }
 
-# openbao is served on both :80 (plain) and :443 (internal TLS) today
+# openbao is served on both :80 (plain) and :443 (step-ca TLS) today
 openbao.pve.lan {
-	tls internal
 	reverse_proxy 192.168.1.60:8200
 }
 
@@ -91,8 +98,6 @@ http://qbit.lan {
 # --- pi.lan (formerly caddy 103, pve-core); LAN/WireGuard only, basic auth ---
 
 pi.lan {
-	tls internal
-
 	@lan remote_ip 192.168.1.0/24 10.8.0.0/24 127.0.0.1/8
 
 	handle @lan {
@@ -113,7 +118,6 @@ pi.lan {
 # The UI on any node manages the whole cluster.
 
 pve.lan {
-	tls internal
 	reverse_proxy https://192.168.1.30:8006 {
 		transport http {
 			tls_insecure_skip_verify

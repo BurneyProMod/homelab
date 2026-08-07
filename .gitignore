@@ -46,3 +46,4 @@ secrets/homelab.env
 !/config/caddy/crossroute.service
 !/config/caddy/check_caddy.sh
 !/config/caddy/keepalived.conf.example
+!/config/caddy/sync-caddy-certs.sh
