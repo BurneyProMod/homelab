@@ -1,0 +1,11 @@
+[Unit]
+Description=Add cross-node route for HA failover
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/crossroutes.sh
+
+[Install]
+WantedBy=multi-user.target

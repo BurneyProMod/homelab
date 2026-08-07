@@ -42,3 +42,5 @@ secrets/homelab.env
 !/config/caddy/README.md
 !/config/step-ca/root_ca.crt
 !/config/step-ca/README.md
+!/config/caddy/crossroutes.sh
+!/config/caddy/crossroute.service
