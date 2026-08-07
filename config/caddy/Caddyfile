@@ -1,0 +1,122 @@
+# Merged reverse proxy config for the HA Caddy pair
+# Nodes: caddy 103 (pve-core, 192.168.1.42, prio 150) + caddy 101 (pve-gpu, 192.168.1.40, prio 100)
+# Fronted by keepalived virtual IP 192.168.1.10. Deployed identically to both nodes.
+# Captured from live configs 2026-08-06:
+#   caddy 116 (pve-exu) *.pve.lan tree, caddy 101 (pve-gpu) *.lan tree, caddy 103 (pve-core) pi.lan
+# Protocol behavior preserved from source (HTTP-only sites stay http://, TLS sites keep tls internal).
+# NEW: pve.lan -> Proxmox web UI (goal: all PVE services behind one front IP).
+
+# --- *.pve.lan tree (formerly caddy 116, pve-exu) ---
+
+http://kanboard.pve.lan {
+	reverse_proxy 192.168.1.71:30083
+}
+
+http://karakeep.pve.lan {
+	reverse_proxy 192.168.1.63:3000
+}
+
+http://rackpeek.pve.lan {
+	reverse_proxy 192.168.1.62:3001
+}
+
+http://trilium.pve.lan {
+	reverse_proxy 192.168.1.70:30081
+}
+
+http://vikunja.pve.lan {
+	reverse_proxy 192.168.1.62:3456
+}
+
+http://actual.pve.lan {
+	reverse_proxy 192.168.1.62:5006
+}
+
+http://immich.pve.lan {
+	reverse_proxy 192.168.1.61:2283
+}
+
+http://lldap.pve.lan {
+	reverse_proxy 192.168.1.60:17170
+}
+
+http://home.pve.lan {
+	reverse_proxy 192.168.1.72:30080
+}
+
+http://code.pve.lan {
+	reverse_proxy 192.168.1.72:30082
+}
+
+http://omni.pve.lan {
+	reverse_proxy 192.168.1.71:30084
+}
+
+# openbao is served on both :80 (plain) and :443 (internal TLS) today
+openbao.pve.lan {
+	tls internal
+	reverse_proxy 192.168.1.60:8200
+}
+
+http://openbao.pve.lan {
+	reverse_proxy 192.168.1.60:8200
+}
+
+# --- *.lan tree (formerly caddy 101, pve-gpu) ---
+
+http://sonarr.lan {
+	reverse_proxy 10.30.0.11:8989
+}
+
+http://radarr.lan {
+	reverse_proxy 10.30.0.12:7878
+}
+
+http://lidarr.lan {
+	reverse_proxy 10.30.0.13:8686
+}
+
+http://prowlarr.lan {
+	reverse_proxy 10.30.0.14:9696
+}
+
+http://jellyfin.lan {
+	reverse_proxy 192.168.1.187:8096
+}
+
+http://qbit.lan {
+	reverse_proxy 10.30.0.15:8889
+}
+
+# --- pi.lan (formerly caddy 103, pve-core); LAN/WireGuard only, basic auth ---
+
+pi.lan {
+	tls internal
+
+	@lan remote_ip 192.168.1.0/24 10.8.0.0/24 127.0.0.1/8
+
+	handle @lan {
+		basic_auth {
+			npburney {$PI_BASIC_AUTH_HASH}
+		}
+
+		reverse_proxy 10.31.0.2:43121
+	}
+
+	handle {
+		respond "LAN access only" 403
+	}
+}
+
+# --- NEW: Proxmox cluster web UI through the front door ---
+# Proxmox serves its own self-signed cert on :8006; upstream TLS is not verified.
+# The UI on any node manages the whole cluster.
+
+pve.lan {
+	tls internal
+	reverse_proxy https://192.168.1.30:8006 {
+		transport http {
+			tls_insecure_skip_verify
+		}
+	}
+}

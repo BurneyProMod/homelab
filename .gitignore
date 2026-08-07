@@ -1,9 +1,3 @@
-# Terraform
-*.tfstate
-*.tfstate.*.backup
-*.tfvars
-!terraform.tfvars.example
-
 # Ansible
 *.retry
 
@@ -16,6 +10,7 @@ Thumbs.db
 *.key
 .env
 *secret.yml
+secrets/homelab.env
 
 # Logs
 *.log
@@ -24,9 +19,24 @@ Thumbs.db
 /docker/**
 !/docker/**/
 !/docker/**/compose.yaml
+!/docker/**/docker-compose.yml
 !/docker/**/.env.example
+# Explicitly ignore runtime data directories that could be copied into the repo
+/docker/servarr/*/config/
+/docker/*/data/
+/docker/*/db/
 
-# Everything in config/ not .example files
+# Everything in config/ except homepage configs and .example files
 /config/**
 !/config/**/
+!/config/homepage/config/services.yaml
+!/config/homepage/config/settings.yaml
+!/config/homepage/config/widgets.yaml
+!/config/homepage/config/bookmarks.yaml
+!/config/homepage/config/kubernetes.yaml
+!/config/homepage/config/docker.yaml
+!/config/homepage/config/custom.js
+!/config/homepage/config/custom.css
 !/config/**/*.example
+!/config/caddy/Caddyfile
+!/config/caddy/README.md
