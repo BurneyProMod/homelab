@@ -1,126 +1,171 @@
-# Merged reverse proxy config for the HA Caddy pair
+# Burney Homelab HA Caddy — public-cert architecture (2026-08-07)
 # Nodes: caddy 103 (pve-core, 192.168.1.42, prio 150) + caddy 101 (pve-gpu, 192.168.1.40, prio 100)
-# Fronted by keepalived virtual IP 192.168.1.10. Deployed identically to both nodes.
-# Captured from live configs 2026-08-06:
-#   caddy 116 (pve-exu) *.pve.lan tree, caddy 101 (pve-gpu) *.lan tree, caddy 103 (pve-core) pi.lan
-# Protocol behavior preserved from source: HTTP-only sites stay http://. TLS
-# sites (openbao, pi, pve.lan) are issued by the single step-ca "Burney Home CA"
-# (config/step-ca/root_ca.crt). Caddy validates via tls-alpn-01 on :443, which
-# needs DNS to point those names at the VIP (done 2026-08-06).
-# NEW: pve.lan -> Proxmox web UI (goal: all PVE services behind one front IP).
+# keepalived VIP 192.168.1.10. Deployed identically to both nodes.
+#
+# All services live on *.burney.network and get Let's Encrypt certs via
+# Cloudflare DNS-01 (TXT only — no public A records, no WAN exposure).
+# Both nodes issue and renew their own certs independently.
+#
+# SECURITY: every site is gated to LAN (192.168.1.0/24) + WireGuard
+# (10.8.0.0/24) + loopback. Anything else gets 403. The OPNsense firewall
+# additionally allows no WAN -> VIP traffic; no public DNS records exist
+# for these names.
 
 {
-	acme_ca https://192.168.1.43:443/acme/acme/directory
-	acme_ca_root /etc/caddy/root_ca.crt
+	email <redacted-email>
+	acme_ca https://acme-v02.api.letsencrypt.org/directory
 }
 
-# --- *.pve.lan tree (formerly caddy 116, pve-exu) ---
-
-http://kanboard.pve.lan {
-	reverse_proxy 192.168.1.71:30083
+# DNS-01 via Cloudflare, resolved via public resolvers so certmagic can find
+# the zone's SOA (the internal OPNsense resolver has no SOA for burney.network).
+(tls_le_dns) {
+	tls {
+		dns cloudflare {env.CLOUDFLARE_API_TOKEN}
+		resolvers 1.1.1.1
+		propagation_timeout 5m
+	}
 }
 
-http://karakeep.pve.lan {
-	reverse_proxy 192.168.1.63:3000
+# Shared LAN + WireGuard gate. Sites that just proxy use this snippet.
+(proxy_lan) {
+	@allowed remote_ip 192.168.1.0/24 10.8.0.0/24 127.0.0.1/8
+	handle @allowed {
+		reverse_proxy {args[0]}
+	}
+	handle {
+		respond 403
+	}
 }
 
-http://rackpeek.pve.lan {
-	reverse_proxy 192.168.1.62:3001
+# --- k3s / LXC services (formerly *.pve.lan on caddy 116) ---
+
+kanboard.burney.network {
+	import tls_le_dns
+	import proxy_lan 192.168.1.71:30083
 }
 
-http://trilium.pve.lan {
-	reverse_proxy 192.168.1.70:30081
+karakeep.burney.network {
+	import tls_le_dns
+	import proxy_lan 192.168.1.63:3000
 }
 
-http://vikunja.pve.lan {
-	reverse_proxy 192.168.1.62:3456
+rackpeek.burney.network {
+	import tls_le_dns
+	import proxy_lan 192.168.1.62:3001
 }
 
-http://actual.pve.lan {
-	reverse_proxy 192.168.1.62:5006
+trilium.burney.network {
+	import tls_le_dns
+	import proxy_lan 192.168.1.70:30081
 }
 
-http://immich.pve.lan {
-	reverse_proxy 192.168.1.61:2283
+vikunja.burney.network {
+	import tls_le_dns
+	import proxy_lan 192.168.1.62:3456
 }
 
-http://lldap.pve.lan {
-	reverse_proxy 192.168.1.60:17170
+actual.burney.network {
+	import tls_le_dns
+	import proxy_lan 192.168.1.62:5006
 }
 
-http://home.pve.lan {
-	reverse_proxy 192.168.1.72:30080
+immich.burney.network {
+	import tls_le_dns
+	import proxy_lan 192.168.1.61:2283
 }
 
-http://code.pve.lan {
-	reverse_proxy 192.168.1.72:30082
+lldap.burney.network {
+	import tls_le_dns
+	import proxy_lan 192.168.1.60:17170
 }
 
-http://omni.pve.lan {
-	reverse_proxy 192.168.1.71:30084
+home.burney.network {
+	import tls_le_dns
+	import proxy_lan 192.168.1.72:30080
 }
 
-# openbao is served on both :80 (plain) and :443 (step-ca TLS) today
-openbao.pve.lan {
-	reverse_proxy 192.168.1.60:8200
+code.burney.network {
+	import tls_le_dns
+	import proxy_lan 192.168.1.72:30082
 }
 
-http://openbao.pve.lan {
-	reverse_proxy 192.168.1.60:8200
+omni.burney.network {
+	import tls_le_dns
+	import proxy_lan 192.168.1.71:30084
 }
 
-# --- *.lan tree (formerly caddy 101, pve-gpu) ---
-
-http://sonarr.lan {
-	reverse_proxy 10.30.0.11:8989
+# OpenBao is reachable over both :80 (plain) and :443 (TLS)
+openbao.burney.network {
+	import tls_le_dns
+	import proxy_lan 192.168.1.60:8200
 }
 
-http://radarr.lan {
-	reverse_proxy 10.30.0.12:7878
+http://openbao.burney.network {
+	import proxy_lan 192.168.1.60:8200
 }
 
-http://lidarr.lan {
-	reverse_proxy 10.30.0.13:8686
+# --- arr / media stack (formerly *.lan on caddy 101) ---
+
+sonarr.burney.network {
+	import tls_le_dns
+	import proxy_lan 10.30.0.11:8989
 }
 
-http://prowlarr.lan {
-	reverse_proxy 10.30.0.14:9696
+radarr.burney.network {
+	import tls_le_dns
+	import proxy_lan 10.30.0.12:7878
 }
 
-http://jellyfin.lan {
-	reverse_proxy 192.168.1.187:8096
+lidarr.burney.network {
+	import tls_le_dns
+	import proxy_lan 10.30.0.13:8686
 }
 
-http://qbit.lan {
-	reverse_proxy 10.30.0.15:8889
+prowlarr.burney.network {
+	import tls_le_dns
+	import proxy_lan 10.30.0.14:9696
 }
 
-# --- pi.lan (formerly caddy 103, pve-core); LAN/WireGuard only, basic auth ---
+jellyfin.burney.network {
+	import tls_le_dns
+	import proxy_lan 192.168.1.187:8096
+}
 
-pi.lan {
-	@lan remote_ip 192.168.1.0/24 10.8.0.0/24 127.0.0.1/8
+qbit.burney.network {
+	import tls_le_dns
+	import proxy_lan 10.30.0.15:8889
+}
 
-	handle @lan {
+# --- pi-agent (formerly pi.lan on caddy 103); basic auth + LAN gate ---
+
+pi.burney.network {
+	import tls_le_dns
+	@allowed remote_ip 192.168.1.0/24 10.8.0.0/24 127.0.0.1/8
+	handle @allowed {
 		basic_auth {
 			npburney {$PI_BASIC_AUTH_HASH}
 		}
-
 		reverse_proxy 10.31.0.2:43121
 	}
-
 	handle {
-		respond "LAN access only" 403
+		respond 403
 	}
 }
 
-# --- NEW: Proxmox cluster web UI through the front door ---
-# Proxmox serves its own self-signed cert on :8006; upstream TLS is not verified.
-# The UI on any node manages the whole cluster.
+# --- Proxmox cluster web UI (formerly pve.lan) ---
+# Upstream TLS is self-signed; not verified. UI on any node manages the cluster.
 
-pve.lan {
-	reverse_proxy https://192.168.1.30:8006 {
-		transport http {
-			tls_insecure_skip_verify
+pve.burney.network {
+	import tls_le_dns
+	@allowed remote_ip 192.168.1.0/24 10.8.0.0/24 127.0.0.1/8
+	handle @allowed {
+		reverse_proxy https://192.168.1.30:8006 {
+			transport http {
+				tls_insecure_skip_verify
+			}
 		}
+	}
+	handle {
+		respond 403
 	}
 }
