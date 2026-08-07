@@ -1,0 +1,39 @@
+# keepalived.conf for the HA caddy pair. VRRPv3, unicast peers (no auth —
+# VRRPv3 dropped authentication; LAN is trusted).
+#
+# Same file on both nodes EXCEPT these four lines:
+#   router_id, priority, unicast_src_ip, unicast_peer
+#
+#   caddy 103 (pve-core, 192.168.1.42): router_id Caddy103, priority 150, src 192.168.1.42, peer 192.168.1.40
+#   caddy 101 (pve-gpu,  192.168.1.40): router_id Caddy101, priority 100, src 192.168.1.40, peer 192.168.1.42
+
+global_defs {
+    router_id Caddy103
+    script_user root
+    enable_script_security
+}
+
+vrrp_script chk_caddy {
+    script "/usr/local/sbin/check_caddy.sh"
+    interval 2
+    fall 2
+    rise 1
+}
+
+vrrp_instance VI_1 {
+    state BACKUP
+    interface eth0
+    virtual_router_id 51
+    priority 150
+    advert_int 1
+    unicast_src_ip 192.168.1.42
+    unicast_peer {
+        192.168.1.40
+    }
+    virtual_ipaddress {
+        192.168.1.10/24 dev eth0
+    }
+    track_script {
+        chk_caddy
+    }
+}

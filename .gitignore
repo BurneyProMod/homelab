@@ -44,3 +44,5 @@ secrets/homelab.env
 !/config/step-ca/README.md
 !/config/caddy/crossroutes.sh
 !/config/caddy/crossroute.service
+!/config/caddy/check_caddy.sh
+!/config/caddy/keepalived.conf.example
