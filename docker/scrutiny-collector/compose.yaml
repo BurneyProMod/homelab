@@ -1,0 +1,22 @@
+services:
+  collector:
+    image: ghcr.io/analogj/scrutiny:latest-collector
+    container_name: scrutiny-collector
+    restart: unless-stopped
+    cap_add:
+      - SYS_RAWIO
+    devices:
+      - /dev/sda
+      - /dev/sdb
+      - /dev/sdc
+      - /dev/sdd
+      - /dev/sde
+      - /dev/sdf
+      - /dev/sdg
+    volumes:
+      - /run/udev:/run/udev:ro
+    environment:
+      COLLECTOR_API_ENDPOINT: http://192.168.1.69:8080
+      COLLECTOR_HOST_ID: burndev
+      COLLECTOR_CRON_SCHEDULE: "0 */6 * * *"
+      COLLECTOR_RUN_STARTUP: "true"
