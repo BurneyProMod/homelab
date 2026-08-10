@@ -1,0 +1,25 @@
+# Scrutiny collector for the Synology NAS (192.168.1.11).
+# Deployed via Container Manager; stack lives at /volume1/docker/scrutiny-collector/ on the NAS.
+# Devices: Synology exposes data disks as /dev/sata1-4 (mapped to /dev/sda-d for smartctl scan)
+# plus /dev/nvme0 (needs SYS_ADMIN in addition to SYS_RAWIO).
+services:
+  collector:
+    image: ghcr.io/analogj/scrutiny:latest-collector
+    container_name: scrutiny-collector
+    restart: unless-stopped
+    cap_add:
+      - SYS_RAWIO
+      - SYS_ADMIN
+    devices:
+      - /dev/sata1:/dev/sda
+      - /dev/sata2:/dev/sdb
+      - /dev/sata3:/dev/sdc
+      - /dev/sata4:/dev/sdd
+      - /dev/nvme0
+    volumes:
+      - /run/udev:/run/udev:ro
+    environment:
+      COLLECTOR_API_ENDPOINT: http://192.168.1.69:8080
+      COLLECTOR_HOST_ID: synology
+      COLLECTOR_CRON_SCHEDULE: "0 */6 * * *"
+      COLLECTOR_RUN_STARTUP: "true"
