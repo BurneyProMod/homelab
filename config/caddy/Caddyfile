@@ -37,6 +37,29 @@
 	}
 }
 
+
+
+# Authentik embedded outpost forward auth (single-application mode).
+# Calls the outpost on 192.168.1.66:9000; /outpost.goauthentik.io/* is served by the outpost.
+(forward_auth) {
+	route {
+		reverse_proxy /outpost.goauthentik.io/* http://192.168.1.66:9000
+		forward_auth http://192.168.1.66:9000 {
+			uri /outpost.goauthentik.io/auth/caddy
+			copy_headers X-Authentik-Username X-Authentik-Groups X-Authentik-Email X-Authentik-Name X-Authentik-Uid X-Authentik-Meta-Outpost X-Authentik-Meta-Provider X-Authentik-Meta-App X-Authentik-Meta-Version
+			trusted_proxies private_ranges
+		}
+		reverse_proxy {args[0]}
+	}
+}
+
+# --- identity / SSO ---
+
+auth.burney.network {
+	import tls_le_dns
+	import proxy_lan 192.168.1.66:9000
+}
+
 # --- k3s / LXC services (formerly *.pve.lan on caddy 116) ---
 
 kanboard.burney.network {
@@ -51,12 +74,31 @@ karakeep.burney.network {
 
 rackpeek.burney.network {
 	import tls_le_dns
-	import proxy_lan 192.168.1.62:3001
+	@allowed remote_ip 192.168.1.0/24 10.8.0.0/24 127.0.0.1/8
+	handle @allowed {
+		import forward_auth 192.168.1.62:3001
+	}
+	handle {
+		respond 403
+	}
 }
 
 trilium.burney.network {
 	import tls_le_dns
-	import proxy_lan 192.168.1.70:30081
+	@allowed remote_ip 192.168.1.0/24 10.8.0.0/24 127.0.0.1/8
+	handle @allowed {
+		# ETAPI + API bypass SSO (pi-agent, MCP)
+		@api path /etapi/* /api/*
+		handle @api {
+			reverse_proxy 192.168.1.70:30081
+		}
+		handle {
+			import forward_auth 192.168.1.70:30081
+		}
+	}
+	handle {
+		respond 403
+	}
 }
 
 vikunja.burney.network {
@@ -79,19 +121,77 @@ lldap.burney.network {
 	import proxy_lan 192.168.1.60:17170
 }
 
+homarr.burney.network {
+	import tls_le_dns
+	import proxy_lan 192.168.1.72:30085
+}
+
 home.burney.network {
 	import tls_le_dns
-	import proxy_lan 192.168.1.72:30080
+	import proxy_lan 192.168.1.72:30085
+}
+
+paperless.burney.network {
+	import tls_le_dns
+	import proxy_lan 192.168.1.67:8000
+}
+
+stash.burney.network {
+	import tls_le_dns
+	import proxy_lan 192.168.1.68:9999
+}
+
+homebox.burney.network {
+	import tls_le_dns
+	import proxy_lan 192.168.1.70:30086
+}
+
+manyfold.burney.network {
+	import tls_le_dns
+	import proxy_lan 192.168.1.71:30087
+}
+
+changedetection.burney.network {
+	import tls_le_dns
+	import proxy_lan 192.168.1.72:30088
+}
+
+scrutiny.burney.network {
+	import tls_le_dns
+	@allowed remote_ip 192.168.1.0/24 10.8.0.0/24 127.0.0.1/8
+	handle @allowed {
+		import forward_auth 192.168.1.69:8080
+	}
+	handle {
+		respond 403
+	}
+}
+
+files.burney.network {
+	import tls_le_dns
+	import proxy_lan 192.168.1.64:8085
 }
 
 code.burney.network {
 	import tls_le_dns
-	import proxy_lan 192.168.1.72:30082
+	@allowed remote_ip 192.168.1.0/24 10.8.0.0/24 127.0.0.1/8
+	handle @allowed {
+		import forward_auth 192.168.1.72:30082
+	}
+	handle {
+		respond 403
+	}
 }
 
 omni.burney.network {
 	import tls_le_dns
-	import proxy_lan 192.168.1.71:30084
+	@allowed remote_ip 192.168.1.0/24 10.8.0.0/24 127.0.0.1/8
+	handle @allowed {
+		import forward_auth 192.168.1.71:30084
+	}
+	handle {
+		respond 403
+	}
 }
 
 # OpenBao is reachable over both :80 (plain) and :443 (TLS)
@@ -108,22 +208,74 @@ http://openbao.burney.network {
 
 sonarr.burney.network {
 	import tls_le_dns
-	import proxy_lan 10.30.0.11:8989
+	@allowed remote_ip 192.168.1.0/24 10.8.0.0/24 127.0.0.1/8
+	handle @allowed {
+		# API keys bypass SSO (Homarr widgets, agents)
+		@api path /api /api/*
+		handle @api {
+			reverse_proxy 10.30.0.11:8989
+		}
+		handle {
+			import forward_auth 10.30.0.11:8989
+		}
+	}
+	handle {
+		respond 403
+	}
 }
 
 radarr.burney.network {
 	import tls_le_dns
-	import proxy_lan 10.30.0.12:7878
+	@allowed remote_ip 192.168.1.0/24 10.8.0.0/24 127.0.0.1/8
+	handle @allowed {
+		# API keys bypass SSO (Homarr widgets, agents)
+		@api path /api /api/*
+		handle @api {
+			reverse_proxy 10.30.0.12:7878
+		}
+		handle {
+			import forward_auth 10.30.0.12:7878
+		}
+	}
+	handle {
+		respond 403
+	}
 }
 
 lidarr.burney.network {
 	import tls_le_dns
-	import proxy_lan 10.30.0.13:8686
+	@allowed remote_ip 192.168.1.0/24 10.8.0.0/24 127.0.0.1/8
+	handle @allowed {
+		# API keys bypass SSO (Homarr widgets, agents)
+		@api path /api /api/*
+		handle @api {
+			reverse_proxy 10.30.0.13:8686
+		}
+		handle {
+			import forward_auth 10.30.0.13:8686
+		}
+	}
+	handle {
+		respond 403
+	}
 }
 
 prowlarr.burney.network {
 	import tls_le_dns
-	import proxy_lan 10.30.0.14:9696
+	@allowed remote_ip 192.168.1.0/24 10.8.0.0/24 127.0.0.1/8
+	handle @allowed {
+		# API keys bypass SSO (Homarr widgets, agents)
+		@api path /api /api/*
+		handle @api {
+			reverse_proxy 10.30.0.14:9696
+		}
+		handle {
+			import forward_auth 10.30.0.14:9696
+		}
+	}
+	handle {
+		respond 403
+	}
 }
 
 jellyfin.burney.network {
@@ -142,10 +294,18 @@ pi.burney.network {
 	import tls_le_dns
 	@allowed remote_ip 192.168.1.0/24 10.8.0.0/24 127.0.0.1/8
 	handle @allowed {
-		basic_auth {
-			npburney {$PI_BASIC_AUTH_HASH}
+		route {
+			reverse_proxy /outpost.goauthentik.io/* http://192.168.1.66:9000
+			forward_auth http://192.168.1.66:9000 {
+				uri /outpost.goauthentik.io/auth/caddy
+				copy_headers X-Authentik-Username X-Authentik-Groups X-Authentik-Email X-Authentik-Name X-Authentik-Uid X-Authentik-Meta-Outpost X-Authentik-Meta-Provider X-Authentik-Meta-App X-Authentik-Meta-Version
+				trusted_proxies private_ranges
+			}
+			basic_auth {
+				npburney {$PI_BASIC_AUTH_HASH}
+			}
+			reverse_proxy 10.31.0.2:43121
 		}
-		reverse_proxy 10.31.0.2:43121
 	}
 	handle {
 		respond 403
