@@ -1,179 +1,121 @@
 # Homelab
 
-Self-sufficient Kubernetes homelab running on a single bare-metal host, provisioned with Ansible.
+Configuration-as-code for the Burney homelab. This repository is the **single
+source of truth** for the environment — Proxmox, k3s, Docker Compose stacks,
+Caddy, and secrets policy. The canonical copy lives on the Synology NAS
+(`/volume1/homelab/repo`, mounted on `pve-core` at
+`/mnt/synology/homelab/repo`) and mirrors to GitHub (`BurneyProMod/homelab`).
 
-## Server Inventory
+Status: P0 reconcile complete (repo matches live state, 2026-08-11). Commit-to-
+live automation is planned — see [docs/gitops-plan.md](docs/gitops-plan.md).
 
-| Host | IP | Role | Notes |
-|------|----|------|------------------|
-| burndev | 192.168.1.50 | k3s server + worker | MSI X470 GAMING PLUS desktop — single-node cluster |
-| Synology NAS | 192.168.1.11 | NFS storage | NAS |
-| OPNsense | 192.168.1.1 | Gateway | Firewall/router |
-| kwsdisplay | - | - | Raspberry Pi 4 Model B Rev 1.5 |
-| kws-rpi-1 | - | - | Raspberry Pi 4 Model B Rev 1.5 |
+## Architecture
 
-## Running Services
-
-### Kubernetes
-
-| App | URL | Description |
-|-----|-----|-------------|
-| Homepage | `home.homelab.lan` | Dashboard |
-| VS Code | `code.homelab.lan` | Browser-based IDE |
-| Trilium | `trilium.homelab.lan` | Notes |
-| Kanboard | `kanboard.homelab.lan` | Kanban board |
-| Omni-Tools | `tools.homelab.lan` | Utility suite |
-| Prometheus | `prometheus.homelab.lan` | Metrics |
-| Grafana | `grafana.homelab.lan` | Dashboards |
-
-### Docker
-
-| App | URL | Description |
-|-----|-----|-------------|
-| Immich | `immich.pve.lan` | Photo/video backup |
-| Vikunja | `vikunja.burndev.lan` | Task management |
-| Linkwarden | `linkwarden.burndev.lan` | Bookmark manager |
-| KaraKeep | `karakeep.burndev.lan` | Read-later / bookmarking |
-| LLDAP | `lldap.burndev.lan` | Lightweight LDAP |
-| Actual Budget | `actual.burndev.lan` | Budgeting |
-| Scanopy | `scanopy.burndev.lan` | Document scanning |
-| Rackpeek | `rackpeek.burndev.lan` | Rack monitoring |
-| DownTify | `downtify.burndev.lan` | Download tracker |
-| LLMeter | `llmeter.burndev.lan` | LLM monitoring |
-| Ollama | — | LLM serving (API only) |
-| FileBrowser Quantum | `files.burndev.lan` | Web file manager |
-
-Homepage auto-discovers Docker services from the `docker/*/compose.yaml` stacks through a read-only Docker socket proxy at `192.168.1.50:2375`.
-
-## Stack
-
-- **Platform**: Bare-metal single-node
-- **Config management**: Ansible
-- **Kubernetes**: k3s v1.36.1 (Traefik & ServiceLB disabled, embedded etcd)
-- **Ingress**: Caddy in `network_mode: host` (sole edge proxy, owns ports 80/443) — K8s services exposed via NodePort (30080-30088)
-
-## Prerequisites
-
-- Ansible >= 2.14 with `community.general` collection
-- kubectl
-- SSH key at `~/.ssh/id_ed25519_npburney_burndev`
-- Synology NAS with NFS exported at `/volume1/homelab/k8s/`
-
-## Deployment Order
-
-### 1. Bootstrap Kubernetes — Ansible
-
-```bash
-cd ansible
-ansible-galaxy collection install -r requirements.yml
-ansible-playbook -i inventory/hosts.ini site.yml
+```
+Internet → OPNsense (192.168.1.1)
+             │
+        keepalived VIP 192.168.1.10  (*.burney.network, HA Caddy pair LXC 103/101)
+             │
+   ┌─────────┼──────────────────────────┐
+   │         │                          │
+ Proxmox cluster            Docker LXCs            K3s cluster (3 VMs)
+ pve-core .30               (per-service LXCs)     k3s-core .70, k3s-exu .71,
+ pve-gpu  .31                                    k3s-gpu .72 (NodePorts 30080+)
+ pve-exu  .32
 ```
 
-This runs the full bootstrap:
-- `common` role: disables swap, loads kernel modules, sets sysctl, installs dependencies, configures UFW firewall
-- `control_plane` role: installs k3s server with `--cluster-init` (embedded etcd) for future scale-out
+| Host | IP | Role |
+|------|----|------|
+| OPNsense | 192.168.1.1 | Gateway, firewall, DNS, DHCP |
+| Synology NAS | 192.168.1.11 | NFS storage (`/volume1/homelab`), critical backups |
+| pve-core | 192.168.1.30 | Proxmox host; hub (repo mount, Caddy LXC 103, SSO LXCs) |
+| pve-gpu | 192.168.1.31 | Proxmox host; Jellyfin/VA-API, Servarr stack, Caddy LXC 101 |
+| pve-exu | 192.168.1.32 | Proxmox host; Immich, Vikunja, Karakeep, Paperless, Stash, Scrutiny |
+| burndev | 192.168.1.50 | Local LLM (Ollama), `burntv` NFS media share (mergerfs pool) |
+| k3s-core / k3s-exu / k3s-gpu | .70 / .71 / .72 | 3-node k3s (all control-plane, `local-path` storage) |
+| kwsdisplay | 192.168.1.168 | Rack kiosk: Prometheus, Grafana, Uptime-Kuma, blackbox |
+| kws-rpi-1 | — | UniFi Controller |
+| homeassistant | — | Home Assistant, ESPHome, Zigbee |
 
-### 2. Install Cert-Manager (for TLS)
+Auth: lldap (LXC 110) → Authentik (LXC 118, `auth.burney.network`) → OIDC +
+forward-auth on Caddy. All public sites use `*.burney.network`.
 
-```bash
-bash kubernetes/cert-manager/install-cert-manager.sh
-kubectl apply -f kubernetes/cert-manager/ca-issuer.yml
+## Repo layout
+
+```
+config/        Caddy (HA pair, VIP, certs via step-ca / Cloudflare DNS-01), step-ca
+docker/        One dir per Compose stack: compose.yaml + .env.example (real .env is gitignored)
+kubernetes/    k3s manifests: apps/, namespaces/, policies/
+docs/          Knowledge base (runbook, service inventory, networking, gitops plan)
+docs/archive/  Retired layers kept for reference: ansible, kube-monitoring, cert-manager, old apps
+scripts/       deploy-k8s, validate, create-secrets, backup/restore, check-k8s
+secrets/       homelab.env (gitignored) + homelab.env.example
+Makefile       Common operations (validate, deploy-k8s, deploy-docker, backup, restore)
 ```
 
-TLS is handled by Caddy at the edge (ports 80/443) using pre-provisioned certificates.
-K8s cert-manager provides the `homelab-ca-issuer` ClusterIssuer for internal K8s certificate needs.
+## Services
 
-To trust certs in your browser, export the CA certificate:
+Full inventory with hosts and URLs: [docs/service-inventory.md](docs/service-inventory.md).
 
-```bash
-kubectl get secret homelab-ca-secret -n cert-manager -o jsonpath='{.data.tls\.crt}' | base64 -d > homelab-ca.crt
-```
+### Kubernetes (k3s, NodePorts)
 
-Import `homelab-ca.crt` into your OS/browser trust store.
+| App | NodePort | Description |
+|-----|----------|-------------|
+| Trilium | 30081 | Notes |
+| code-server | 30082 | Browser IDE |
+| Kanboard | 30083 | Kanban |
+| Omni-Tools | 30084 | Utility suite |
+| Homarr | 30085 | Dashboard (`home.burney.network`) |
+| Homebox | 30086 | Inventory |
+| Manyfold | 30087 | 3D models |
+| Changedetection | 30088 | Website change alerts |
+| kube-state-metrics | 30100 | Cluster metrics for kwsdisplay Prometheus |
 
-### 3. Install Platform Components
+### Docker / LXCs
 
-```bash
-bash scripts/install-nfs-provisioner.sh
-bash scripts/install-kube-prometheus-stack.sh
-bash scripts/install-blackbox-exporter.sh
-```
+Media (pve-gpu): Jellyfin, Sonarr, Radarr, Lidarr, Prowlarr, qBittorrent.
+Apps (pve-exu): Immich, Vikunja, RackPeek, Actual Budget, Karakeep, Paperless-ngx, Stash, Scrutiny, Tasks.md.
+Apps (pve-core): LLDAP, OpenBao, FileBrowser Quantum, Scanopy, Authentik.
+Edge: HA Caddy pair (103/101). The repo `docker/` dirs hold the compose definitions
+(plus `.env.example`); runtime `.env` files stay on the hosts, gitignored.
 
-### 4. Deploy K8s Apps — kubectl
+Monitoring runs on kwsdisplay (Docker Compose), scraping k3s via
+kube-state-metrics and LAN targets via blackbox. See [docs/monitoring.md](docs/monitoring.md).
 
-```bash
-# Dry-run full deployment (safe validation)
-bash scripts/deploy-k8s.sh --dry-run
+## Quick start (operating)
 
-# Apply manifests
-bash scripts/deploy-k8s.sh
-```
-
-Notes:
-- `scripts/deploy-k8s.sh` applies `kubernetes/policies/` recursively.
-- Example secret manifests (`*.example.yml`) are intentionally excluded from deploy.
-- `kubernetes/monitoring/blackbox-values.yml`, `kube-prometheus-stack-values.yml`, and `prometheus-additional-scrape.yml` are Helm values/snippets, not standalone Kubernetes resources.
-
-### 5. Deploy Docker Stacks
+All commands run from the canonical repo on pve-core.
 
 ```bash
-make deploy-docker
+make validate                # pre-flight: syntax, secrets, mounts, dry-runs
+bash scripts/create-secrets.sh   # creates k8s secrets from secrets/homelab.env
+bash scripts/deploy-k8s.sh --dry-run   # preview
+bash scripts/deploy-k8s.sh    # apply k8s manifests + rollout checks
+make deploy-docker           # docker compose up -d per stack (host targeting: planned, P1)
+make backup                  # repo + app data to Synology
+bash scripts/restore-app-data.sh --dry-run   # preview restore
 ```
 
-## Operations
+Deployment order, rollback, and recovery: [docs/runbook.md](docs/runbook.md).
 
-### Quick Reference (Makefile)
+## Secrets policy
 
-```bash
-make validate          # Pre-flight checks (syntax, secrets, mounts, dry-runs)
-make bootstrap         # Ansible + platform installs
-make deploy-k8s        # Apply all K8s manifests
-make deploy-docker     # Start all Docker stacks
-make backup            # Full backup (repo + app data)
-make restore-dry-run   # Preview restore from NAS (no changes)
-make restore           # Restore app data from NAS (requires --force)
-```
+- No secrets in tracked files. Real values live in `secrets/homelab.env`
+  (gitignored, chmod 600) and host-local `.env` files.
+- Committed files reference secrets indirectly: `${VAR}`, `secretKeyRef`,
+  `{{HOMEPAGE_VAR_*}}`-style placeholders.
+- k8s Secrets are created out-of-band via `scripts/create-secrets.sh`; example
+  manifests (`*.example.yml`) ship as templates only.
+- Leak policy: rotate any credential that appears in this repo.
 
-### Validate Before Deploying
+## Storage
 
-```bash
-make validate
-```
+k3s uses `local-path` (rancher.io/local-path, default) — hostPath volumes on
+the node where the pod lands. NAS-backed storage for app data is provisioned
+per-service (NFS from Synology). See [docs/storage.md](docs/storage.md).
 
-Checks shell syntax, YAML lint, unpinned images, missing .env files, NAS mount,
-Docker compose config, kubectl dry-runs, and secrets in tracked files.
+## Docs
 
-### Restore from Backup
-
-The NAS backup at `/mnt/syn/backups/homelab` contains a full copy of this repo.
-To restore on a new machine:
-
-```bash
-# 1. Preview repo restore from NAS (no changes)
-bash scripts/pull-from-nas-backup.sh --dry-run
-
-# 2. Pull backup into local repo
-bash scripts/pull-from-nas-backup.sh --apply
-
-# 3. Preview app-data restore
-bash scripts/restore-app-data.sh --dry-run
-
-# 4. Restore app data (Docker volumes, databases, Caddy certs)
-bash scripts/restore-app-data.sh --force
-
-# 5. Re-run Ansible (idempotent, checks cluster health)
-cd ~/dev/homelab/ansible
-ansible-playbook site.yml
-
-# 6. Re-apply all K8s manifests (idempotent)
-bash ~/dev/homelab/scripts/deploy-k8s.sh
-```
-
-Full recovery procedures are in [docs/runbook.md](docs/runbook.md).
-
-## K8s Storage Classes
-
-| Name | Provisioner | Backend |
-|------|------------|---------|
-| `local-path` | rancher.io/local-path | Node-local storage (default) |
-| `nfs` | nfs-subdir-external-provisioner | Synology NAS |
+- [docs/homelab-docs-master.md](docs/homelab-docs-master.md) — full index
+- [docs/gitops-plan.md](docs/gitops-plan.md) — commit-to-live roadmap (P0 done, P1+ pending)
+- [docs/runbook.md](docs/runbook.md) — recovery and backup/restore
