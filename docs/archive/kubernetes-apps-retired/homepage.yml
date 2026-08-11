@@ -1,0 +1,368 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: homepage-config
+  namespace: default
+data:
+  bookmarks.yaml: |
+    ---
+    - Homelab:
+        - Pi Agent:
+            - abbr: PI
+              href: https://pi.burney.network
+        - Grafana:
+            - abbr: GR
+              href: http://kwsdisplay.lan:3000
+        - Home Assistant:
+            - abbr: HA
+              href: http://homeassistant.lan:8123
+
+    - Developer:
+        - Github:
+            - abbr: GH
+              href: https://github.com/
+
+    - Social:
+        - Reddit:
+            - abbr: RE
+              href: https://reddit.com/
+
+    - Entertainment:
+        - YouTube:
+            - abbr: YT
+              href: https://youtube.com/
+  custom.css: ""
+  custom.js: ""
+  kubernetes.yaml: |
+    ---
+    mode: cluster
+  services.yaml: |
+    ---
+    # Updated 2026-08-07 — all Caddy-fronted services moved to *.burney.network
+
+    - Infrastructure:
+        - OPNsense:
+            href: http://opnsense.lan
+            description: Router
+            ping: 192.168.1.1
+        - UniFi:
+            href: https://kws-rpi-1.lan:11443
+            description: Wi-Fi Controller
+            ping: kws-rpi-1.lan
+        - Pi Agent:
+            icon: si-raspberrypi
+            href: https://pi.burney.network
+            description: Coding agent
+            ping: pi.burney.network
+
+    - Proxmox:
+        - pve-core:
+            icon: proxmox.png
+            href: https://pve-core.lan:8006
+            description: Node 1 — core services
+            ping: pve-core.lan
+        - pve-gpu:
+            icon: proxmox.png
+            href: https://pve-gpu.lan:8006
+            description: Node 2 — GPU / media
+            ping: pve-gpu.lan
+        - pve-exu:
+            icon: proxmox.png
+            href: https://pve-exu.lan:8006
+            description: Node 3 — apps / bulk
+            ping: pve-exu.lan
+
+    - k3s Cluster:
+        - Trilium:
+            icon: trilium.png
+            href: https://trilium.burney.network
+            description: Knowledge base
+            namespace: tools
+            podSelector: app=trilium
+        - code-server:
+            icon: code-server.png
+            href: https://code.burney.network
+            description: VS Code in browser
+            namespace: tools
+            podSelector: app=code-server
+        - Kanboard:
+            icon: kanboard.png
+            href: https://kanboard.burney.network
+            description: Project management
+            namespace: tools
+            podSelector: app=kanboard
+        - omni-tools:
+            icon: omni-tools.png
+            href: https://omni.burney.network
+            description: Utilities
+            namespace: tools
+            podSelector: app=omni-tools
+
+    - Applications:
+        - Vikunja:
+            icon: vikunja.png
+            href: https://vikunja.burney.network
+            description: Task management
+            ping: vikunja.burney.network
+        - Actual Budget:
+            icon: actual-budget.png
+            href: https://actual.burney.network
+            description: Personal finance
+            ping: actual.burney.network
+        - KaraKeep:
+            icon: karakeep.png
+            href: https://karakeep.burney.network
+            description: Bookmark manager
+            ping: karakeep.burney.network
+        - LLDAP:
+            icon: lldap.png
+            href: https://lldap.burney.network
+            description: User directory
+            ping: lldap.burney.network
+
+        - OpenBao:
+            icon: openbao.svg
+            href: https://openbao.burney.network
+            description: Secrets management
+            ping: openbao.burney.network
+        - RackPeek:
+            icon: rackpeek.png
+            href: https://rackpeek.burney.network
+            description: Server monitoring
+            ping: rackpeek.burney.network
+        - Files:
+            icon: filebrowser.png
+            href: https://files.burney.network
+            description: Web file manager
+            ping: files.burney.network
+
+    - Media:
+        - Jellyfin:
+            icon: jellyfin.png
+            href: https://jellyfin.burney.network
+            description: Media streaming
+            ping: jellyfin.burney.network
+            widget:
+              type: jellyfin
+              url: https://jellyfin.burney.network
+        - Sonarr:
+            icon: sonarr.png
+            href: https://sonarr.burney.network
+            description: TV series
+            ping: sonarr.burney.network
+            widget:
+              type: sonarr
+              url: https://sonarr.burney.network
+              key: "{{HOMEPAGE_VAR_SONARR_KEY}}"
+        - Radarr:
+            icon: radarr.png
+            href: https://radarr.burney.network
+            description: Movies
+            ping: radarr.burney.network
+            widget:
+              type: radarr
+              url: https://radarr.burney.network
+              key: "{{HOMEPAGE_VAR_RADARR_KEY}}"
+        - Lidarr:
+            icon: lidarr.png
+            href: https://lidarr.burney.network
+            description: Music
+            ping: lidarr.burney.network
+            widget:
+              type: lidarr
+              url: https://lidarr.burney.network
+              key: "{{HOMEPAGE_VAR_LIDARR_KEY}}"
+
+        - Immich:
+            icon: immich.png
+            href: https://immich.burney.network
+            description: Photo and video backup
+            ping: immich.burney.network
+
+    - Downloads:
+        - Prowlarr:
+            icon: prowlarr.png
+            href: https://prowlarr.burney.network
+            description: Indexers
+            ping: prowlarr.burney.network
+            widget:
+              type: prowlarr
+              url: https://prowlarr.burney.network
+              key: "{{HOMEPAGE_VAR_PROWLARR_KEY}}"
+        - qBittorrent:
+            icon: qbittorrent.png
+            href: https://qbit.burney.network
+            description: Torrents (VPN)
+            widget:
+              type: qbittorrent
+              url: https://qbit.burney.network
+              username: "{{HOMEPAGE_VAR_QBITTORRENT_USERNAME}}"
+              password: "{{HOMEPAGE_VAR_QBITTORRENT_PASSWORD}}"
+  settings.yaml: |
+    ---
+    statusStyle: dot
+    showStats: true
+  widgets.yaml: |
+    ---
+    - datetime:
+        text_size: xl
+        format:
+          dateStyle: long
+          timeStyle: short
+          hour12: true
+    - resources:
+        cpu: true
+        memory: true
+        disk: /
+        uptime: true
+        network: true
+    - search:
+        provider: duckduckgo
+        target: _blank
+    - kubernetes:
+        cluster:
+          show: true
+          cpu: true
+          memory: true
+          showLabel: true
+          label: "homelab"
+        nodes:
+          show: true
+          cpu: true
+          memory: true
+          showLabel: true
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: homepage-images
+  namespace: default
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: local-path
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: homepage
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: homepage
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: homepage
+    spec:
+      automountServiceAccountToken: true
+      serviceAccountName: homepage
+      containers:
+      - name: homepage
+        image: ghcr.io/gethomepage/homepage:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 3000
+          protocol: TCP
+        env:
+        - name: HOMEPAGE_ALLOWED_HOSTS
+          value: home.burney.network
+        envFrom:
+        - secretRef:
+            name: homepage-secret
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 3000
+          initialDelaySeconds: 10
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 3000
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        resources:
+          limits:
+            cpu: 200m
+            memory: 256Mi
+          requests:
+            cpu: 50m
+            memory: 64Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          seccompProfile:
+            type: RuntimeDefault
+        volumeMounts:
+        - mountPath: /app/config/services.yaml
+          name: services
+          subPath: services.yaml
+        - mountPath: /app/config/settings.yaml
+          name: settings
+          subPath: settings.yaml
+        - mountPath: /app/config/widgets.yaml
+          name: widgets
+          subPath: widgets.yaml
+        - mountPath: /app/config/bookmarks.yaml
+          name: bookmarks
+          subPath: bookmarks.yaml
+        - mountPath: /app/config/kubernetes.yaml
+          name: kubernetes
+          subPath: kubernetes.yaml
+        - mountPath: /app/config/custom.js
+          name: custom-js
+          subPath: custom.js
+        - mountPath: /app/config/custom.css
+          name: custom-css
+          subPath: custom.css
+        - mountPath: /app/public/images
+          name: images
+      volumes:
+      - configMap:
+          name: homepage-config
+        name: services
+      - configMap:
+          name: homepage-config
+        name: settings
+      - configMap:
+          name: homepage-config
+        name: widgets
+      - configMap:
+          name: homepage-config
+        name: bookmarks
+      - configMap:
+          name: homepage-config
+        name: kubernetes
+      - configMap:
+          name: homepage-config
+        name: custom-js
+      - configMap:
+          name: homepage-config
+        name: custom-css
+      - name: images
+        persistentVolumeClaim:
+          claimName: homepage-images
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: homepage-svc
+  namespace: default
+spec:
+  type: NodePort
+  selector:
+    app: homepage
+  ports:
+  - port: 80
+    targetPort: 3000
+    nodePort: 30080

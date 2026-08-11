@@ -1,0 +1,40 @@
+name: llmeter
+
+services:
+  llmeter:
+    build:
+      context: .
+    container_name: llmeter
+    restart: unless-stopped
+    user: "${PUID}:${PGID}"
+    env_file:
+      - .env
+    ports:
+      - "127.0.0.1:8790:8080"
+    volumes:
+      - /opt/docker/llmeter/data:/data
+      - /home/npburney/.pi/agent/sessions:/pi-sessions:ro
+      - /home/npburney/.config/llmeter:/run/secrets/llmeter:ro
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/healthz', timeout=3)"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    labels:
+      - homepage.group=Infrastructure
+      - homepage.name=LLMeter
+      - homepage.icon=mdi-chart-box-outline
+      - homepage.href=https://llmeter.burndev.lan
+      - homepage.description=LLM API balances and Pi usage

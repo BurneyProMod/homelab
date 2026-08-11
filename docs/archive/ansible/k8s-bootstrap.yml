@@ -1,0 +1,12 @@
+---
+- name: Common setup for all K8s nodes
+  hosts: k8s_cluster
+  become: yes
+  roles:
+    - common
+
+- name: Initialize k3s control plane
+  hosts: control_plane
+  become: yes
+  roles:
+    - control_plane

@@ -1,4 +1,4 @@
-# Allow nginx-ingress controller to reach all tools pods
+# Allow traffic from Caddy (host network) via NodePort to all tools pods
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -10,6 +10,5 @@ spec:
   - Ingress
   ingress:
   - from:
-    - namespaceSelector:
-        matchLabels:
-          kubernetes.io/metadata.name: ingress-nginx
+    - ipBlock:
+        cidr: 192.168.1.0/24

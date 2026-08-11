@@ -2,15 +2,15 @@
 
 services:
   rackpeek:
-    image: aptacode/rackpeek:latest
+    image: aptacode/rackpeek:latest  # TODO: pin to versioned tag or sha256 digest when available
     container_name: rackpeek
     labels:
-      - homepage.group=Docker
+      - homepage.group=Infrastructure
       - homepage.name=RackPeek
       - homepage.href=http://192.168.1.50:3001
       - homepage.description=Rack server monitoring dashboard
     ports:
-      - "3001:8080"
+      - "127.0.0.1:3001:8080"
     volumes:
       # Need to chown -R 1654:1654 on data
       - ./data:/app/config

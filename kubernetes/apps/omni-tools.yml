@@ -4,7 +4,12 @@ metadata:
   name: omni-tools
   namespace: tools
 spec:
-  replicas: 1
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
   selector:
     matchLabels:
       app: omni-tools
@@ -44,41 +49,10 @@ metadata:
   name: omni-tools-svc
   namespace: tools
 spec:
+  type: NodePort
   selector:
     app: omni-tools
   ports:
   - port: 80
     targetPort: 80
----
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: omni-tools
-  namespace: tools
-  annotations:
-    gethomepage.dev/enabled: 'true'
-    gethomepage.dev/name: Omni Tools
-    gethomepage.dev/group: Tools
-    gethomepage.dev/icon: tools.png
-    gethomepage.dev/description: Web utility toolbox
-    gethomepage.dev/siteMonitor: http://omni-tools-svc.tools.svc.cluster.local
-    gethomepage.dev/app: omni-tools
-    gethomepage.dev/pod-selector: ''
-    cert-manager.io/cluster-issuer: homelab-ca-issuer
-spec:
-  ingressClassName: nginx
-  rules:
-  - host: omni.homelab.lan
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: omni-tools-svc
-            port:
-              number: 80
-  tls:
-  - hosts:
-    - omni.homelab.lan
-    secretName: omni-tls
+    nodePort: 30085

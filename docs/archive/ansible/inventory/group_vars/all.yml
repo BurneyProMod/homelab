@@ -1,0 +1,14 @@
+ansible_user: npburney
+ansible_ssh_private_key_file: ~/.ssh/id_ed25519_npburney_burndev
+ansible_python_interpreter: /usr/bin/python3
+ansible_ssh_common_args: '-o StrictHostKeyChecking=accept-new'
+k3s_version: "v1.36.1+k3s1"
+
+# Node labels applied after cluster join
+node_labels:
+  burndev:
+    - "node-type=desktop"
+    - "gpu=nvidia"
+
+# Node taints applied after cluster join (optional)
+node_taints: {}

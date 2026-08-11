@@ -1,0 +1,26 @@
+services:
+  downtify:
+    image: ghcr.io/henriquesebastiao/downtify:latest
+    container_name: downtify
+    user: 1000:1000
+    environment:
+      - TZ=America/Chicago
+      # PO Token for high-quality audio (ios/mweb clients).
+      # Without this, only format 18 (~128kbps AAC) is available.
+      # Format: "client.context+token_value" (e.g. "ios.gvs+ABC123")
+      # Generate at: https://github.com/yt-dlp/yt-dlp/wiki/PO-Token-Guide
+      # - DOWNTIFY_YT_PO_TOKEN=ios.gvs+YOUR_TOKEN_HERE
+    ports:
+      - 127.0.0.1:8000:8000
+    volumes:
+      - /data/pool/burntv/media/music:/downloads
+      - ./data:/data
+      # Patched downloader with PO token support + default IPv4
+    restart: unless-stopped
+    labels:
+      - homepage.group=Media
+      - homepage.name=Downtify
+      - homepage.icon=downtify.png
+      - homepage.href=https://downtify.burndev.lan
+      - homepage.description=Music downloader
+      - homepage.showStats=true

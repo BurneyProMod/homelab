@@ -1,0 +1,2 @@
+# burndev-specific overrides — bare-metal desktop, sole k3s node
+ansible_connection: local

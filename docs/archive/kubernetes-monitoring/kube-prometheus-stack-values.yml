@@ -1,0 +1,62 @@
+# kube-prometheus-stack Helm values for homelab single-node cluster.
+# Install with: bash scripts/install-kube-prometheus-stack.sh
+
+# Disable bundled Grafana (we deploy our own via kubernetes/monitoring/grafana.yml)
+grafana:
+  enabled: false
+
+# Disable bundled alertmanager if not needed (optional)
+alertmanager:
+  enabled: true
+  fullnameOverride: alertmanager
+
+# Prometheus configuration
+prometheus:
+  fullnameOverride: prometheus
+  prometheusSpec:
+    # Load additional scrape configs from a K8s Secret
+    additionalScrapeConfigsSecret:
+      name: prometheus-additional-scrape
+      key: scrape.yml
+    # Enable PrometheusRules from arbitrary namespaces
+    ruleSelectorNilUsesHelmValues: false
+    ruleSelector: {}
+    ruleNamespaceSelector: {}
+    # Retention and resources for single-node
+    retention: 15d
+    retentionSize: 5GB
+    resources:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+      limits:
+        cpu: 1000m
+        memory: 2Gi
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          accessModes: ["ReadWriteOnce"]
+          storageClassName: local-path
+          resources:
+            requests:
+              storage: 10Gi
+
+# kubelet scraping (needed for node metrics)
+kubelet:
+  enabled: true
+
+# kube-state-metrics
+kube-state-metrics:
+  enabled: true
+
+# node-exporter
+nodeExporter:
+  enabled: true
+
+# Disable default prometheus-node-exporter if bundle includes it
+prometheus-node-exporter:
+  enabled: false
+
+# CoreDNS monitoring (k3s ships with CoreDNS)
+kubeDns:
+  enabled: true

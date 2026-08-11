@@ -1,0 +1,237 @@
+---
+# DESIGN DOCUMENT — not yet wired into main.yml
+# Maps ~/Downloads, ~/Music, ~/Pictures, ~/Videos to Synology NFS shares.
+#
+# Assumptions (correct before running):
+#   - Synology exports /volume1/npburney/{Downloads,Music,Pictures,Videos} via NFS
+#   - npburney UID=1000 GID=1000 on BOTH burndev and Synology
+#   - nfs-common is already installed (common role does this)
+#
+# Protocol: NFS (matches existing /mnt/syn and /mnt/immich pattern)
+# Strategy: One mount per XDG folder (four fstab entries + four systemd automounts)
+#
+# Post-run: reboot or run `systemctl daemon-reload && systemctl start
+#   home-npburney-Downloads.automount home-npburney-Music.automount
+#   home-npburney-Pictures.automount home-npburney-Videos.automount`
+
+# ---------------------------------------------------------------------------
+# PITFALL AUDIT
+# ---------------------------------------------------------------------------
+
+# P1: UID/GID MISMATCH
+#   NFSv4 with sec=sys trusts the client's UID/GID. If npburney is UID 1028
+#   on the Synology but 1000 on burndev, writes will fail with "Permission
+#   denied" or worse — files will be owned by the wrong UID on disk.
+#   Mitigation: Verify with `id npburney` on Synology before running.
+#   Detection: After mount, `touch ~/Downloads/.write-test && rm ~/Downloads/.write-test`
+
+# P2: STALE FILE HANDLES DURING NAS OUTAGE
+#   When the NAS reboots or drops off the network, NFS clients receive
+#   ESTALE. Processes accessing the mount point will hang in D-state
+#   (uninterruptible sleep) until the NAS returns OR the process is
+#   killed. This can lock up file managers, terminals, and desktop
+#   sessions.
+#   Mitigations:
+#     - `timeo=14` (1.4s timeout, retries) limits per-RPC hang
+#     - `hard,intr` allows SIGKILL to interrupt (NFS default is hard)
+#     - `x-systemd.automount` unmounts idle shares after 60s, reducing
+#       exposure window — but any process with an open fd keeps it mounted
+#   Residual risk: A `ls ~/Downloads` during a NAS outage hangs ~14s then
+#   returns I/O error. A file manager thumbnailer during outage hangs
+#   until timeout.
+
+# P3: AUTOMOUNT RACE WITH USER SESSION
+#   systemd automount triggers on first access. If the user's desktop
+#   session starts before the network is fully up (common on Wi-Fi or
+#   DHCP), the first access to ~/Downloads triggers the mount, which
+#   fails, and the automount unit goes into a failed state. Subsequent
+#   accesses see an empty directory or ENOENT until the automount is
+#   restarted.
+#   Mitigation: The fstab entry uses `nofail,_netdev` so boot does not
+#   block. The automount retries on next access. `x-systemd.device-
+#   timeout=10` limits initial probe to 10s.
+#   Residual risk: If the NAS is down at boot and the user opens a file
+#   manager, the mount attempt fails. The automount should retry on next
+#   access (systemd default behavior), but some DEs cache directory
+#   listings. `systemctl restart home-npburney-Downloads.automount` fixes
+#   it manually.
+
+# P4: EXISTING LOCAL FILES HIDDEN BY MOUNT
+#   If ~/Downloads contains 50GB of files and you mount an empty NFS
+#   share over it, those 50GB are still on disk (consuming space) but
+#   invisible. The files are not lost — unmount and they reappear — but
+#   they waste space and create confusion.
+#   Mitigation: The Ansible task checks if the directory is non-empty
+#   before mounting. If non-empty, it:
+#     a) Warns the user (files exist, mount will hide them)
+#     b) Optionally rsyncs them to the NAS first (requires NAS to be
+#        temporarily mounted at a staging path)
+#   Designed behavior: The task asserts `target_is_empty` and fails if
+#   the directory is non-empty, printing instructions for manual
+#   migration. No silent data hiding.
+
+# P5: GNOME/GVFS MOUNT SHADOWING
+#   GNOME's GVFS daemon and Nautilus can auto-mount network shares via
+#   their own mechanisms. If GVFS also mounts the Synology share, you get
+#   a double mount or a shadow mount that confuses paths.
+#   Mitigation: The fstab/systemd mount takes precedence over GVFS for
+#   the same path. GVFS mounts appear under /run/user/1000/gvfs/ and do
+#   not conflict with fstab mounts at $HOME paths.
+#   Risk: Low. This is an fstab mount, not a GVFS mount. No conflict.
+
+# P6: SNAP/FIREJAIL SANDBOXING
+#   If Firefox or other snap/flatpak apps access ~/Downloads, the
+#   sandbox may block access to FUSE or NFS mount points. Snaps
+#   specifically block paths not under /home or /media by default.
+#   Mitigation: The mount points ARE under /home (not /mnt), so snaps
+#   with the `home` interface should see them. Flatpaks need
+#   `--filesystem=home`. AppImages run unsandboxed.
+#   Residual risk: Snaps with strict confinement (no `home` plug) will
+#   see an empty ~/Downloads. Verify with `snap connections firefox`.
+
+# P7: BACKUP SCRIPT INTERACTION
+#   `scripts/backup.sh` rsyncs the homelab repo to /mnt/syn. If you write
+#   backup scripts that walk ~/Downloads, they will traverse the NFS mount
+#   TO the NAS and copy data FROM the NAS back TO the NAS — a circular,
+#   wasteful copy.
+#   Mitigation: Backup scripts must use `--one-file-system` (rsync) or
+#   `-x` (find/tar) to avoid crossing filesystem boundaries into NFS
+#   mounts.
+
+# P8: MERGERFS POOL CONFLICT (LOW PROBABILITY)
+#   The mergerfs pool at /data/pool uses `category.create=epmfs`. If
+#   ~/Downloads is on NFS and an application tries to write, mergerfs
+#   is not involved. No conflict.
+#   Risk: None. Different mount trees.
+
+# P9: NFS EXPORT OPTIONS ON SYNOLOGY SIDE
+#   The Synology NFS export must be configured with:
+#     - `rw` (read-write)
+#     - `no_root_squash` OR `all_squash` with correct anonuid/anongid
+#     - `async` (performance) or `sync` (data integrity)
+#   If the export is `ro` (read-only), writes fail silently in some apps
+#   and noisily in others.
+#   Mitigation: Verify the Synology NFS permissions before running.
+#   Detection: Touch test as in P1.
+
+# P10: FIREWALL (UFW) INTERACTION
+#    The common role configures UFW with `default deny incoming`. NFS
+#    clients use ephemeral source ports and connect to port 2049 (nfsd)
+#    plus portmapper (111) and rpc.mountd (dynamically assigned). UFW
+#    in its default configuration allows outbound connections and
+#    established/related return traffic, so the NFS client should work.
+#    NFSv4 uses only port 2049, which simplifies firewall traversal.
+#    Risk: Low with NFSv4. The existing /mnt/syn and /mnt/immich mounts
+#    already work through UFW.
+
+# ---------------------------------------------------------------------------
+# OPTIMIZATIONS
+# ---------------------------------------------------------------------------
+
+# O1: NFSv4.2 vs NFSv4.1
+#    The existing mounts use NFSv4.1. If the Synology supports 4.2,
+#    you get server-side clone/copy offload (cp --reflink) and sparse
+#    file support. Negligible benefit for home folders.
+#    Recommendation: Stick with the existing vers=4.1 default.
+
+# O2: rsize/wsize tuning
+#    The existing mounts use defaults (rsize=131072, wsize=131072 which
+#    is the NFSv4 max). These are already optimal for gigabit LAN.
+#    No change needed.
+
+# O3: noatime
+#    Adding `noatime` to NFS mount options eliminates metadata writes on
+#    every read. Low impact for home folders, but free optimization.
+#    Recommendation: Add `noatime` to mount options.
+
+# O4: Single mount vs multi-mount
+#    Alternative: mount /volume1/npburney once at /mnt/npburney and
+#    bind-mount subdirs into ~/Downloads etc. This uses one NFS
+#    connection instead of four.
+#    Trade-off: bind mounts are NOT visible in `mount` output as NFS
+#    (they appear as `none on /home/... type none (rw,bind)`), which
+#    makes debugging harder. Also, systemd has known ordering issues
+#    with fstab bind mounts when the source is an automount.
+#    Decision: Four individual mounts. Clarity over connection count.
+
+# ---------------------------------------------------------------------------
+# ANSIBLE TASKS
+# ---------------------------------------------------------------------------
+
+- name: "nfs-home-dirs | Gather XDG directory facts"
+  ansible.builtin.stat:
+    path: "{{ item.path }}"
+  loop:
+    - { path: "/home/npburney/Downloads", export: "/volume1/npburney/Downloads" }
+    - { path: "/home/npburney/Music",     export: "/volume1/npburney/Music" }
+    - { path: "/home/npburney/Pictures",  export: "/volume1/npburney/Pictures" }
+    - { path: "/home/npburney/Videos",    export: "/volume1/npburney/Videos" }
+  register: _nfs_dir_stat
+
+- name: "nfs-home-dirs | Assert target directories exist"
+  ansible.builtin.assert:
+    that: item.stat.exists and item.stat.isdir
+    fail_msg: "{{ item.item.path }} does not exist or is not a directory"
+  loop: "{{ _nfs_dir_stat.results }}"
+
+- name: "nfs-home-dirs | Assert target directories are empty (P4)"
+  ansible.builtin.assert:
+    that: item.stat.size == 0 or (item.stat.isdir and (item.stat.blocks | int) == 0)
+    fail_msg: >
+      {{ item.item.path }} is not empty.
+      Files exist that would be hidden by the NFS mount.
+      Move them to the NAS first, then re-run.
+      Hint: temporarily mount the NAS share elsewhere and rsync.
+  loop: "{{ _nfs_dir_stat.results }}"
+  # NOTE: stat.blocks is not a reliable emptiness test for all
+  # filesystems. A more robust check would count directory entries.
+  # For a design-phase template this is a placeholder — replace with
+  # a `find`-based check before implementing.
+
+- name: "nfs-home-dirs | Add NFS mounts to /etc/fstab"
+  ansible.posix.mount:
+    src: "{{ item.export }}"
+    path: "{{ item.path }}"
+    fstype: nfs
+    opts: "defaults,nofail,noatime,_netdev,x-systemd.automount,x-systemd.device-timeout=10,timeo=14"
+    state: present
+  loop:
+    - { path: "/home/npburney/Downloads", export: "192.168.1.11:/volume1/npburney/Downloads" }
+    - { path: "/home/npburney/Music",     export: "192.168.1.11:/volume1/npburney/Music" }
+    - { path: "/home/npburney/Pictures",  export: "192.168.1.11:/volume1/npburney/Pictures" }
+    - { path: "/home/npburney/Videos",    export: "192.168.1.11:/volume1/npburney/Videos" }
+  notify: Reload systemd
+
+- name: "nfs-home-dirs | Enable and start automount units"
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    enabled: yes
+    state: started
+  loop:
+    - "home-npburney-Downloads.automount"
+    - "home-npburney-Music.automount"
+    - "home-npburney-Pictures.automount"
+    - "home-npburney-Videos.automount"
+
+# ---------------------------------------------------------------------------
+# POST-TASK VALIDATION (manual)
+# ---------------------------------------------------------------------------
+# After running these tasks and rebooting (or starting the automounts):
+#
+#   1. Verify mounts are active:
+#      mount | grep -E 'home/npburney/(Downloads|Music|Pictures|Videos)'
+#
+#   2. Write test each directory (P1/P9):
+#      for d in Downloads Music Pictures Videos; do
+#        touch ~/$d/.write-test && rm ~/$d/.write-test && echo "$d: OK" || echo "$d: FAIL"
+#      done
+#
+#   3. Verify UID ownership:
+#      ls -ldn ~/Downloads ~/Music ~/Pictures ~/Videos
+#      # Should show 1000 1000 for all
+#
+#   4. Verify xdg-user-dirs still point correctly:
+#      xdg-user-dir DOWNLOAD
+#      xdg-user-dir MUSIC
+#      xdg-user-dir PICTURES
+#      xdg-user-dir VIDEOS

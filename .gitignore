@@ -26,17 +26,9 @@ secrets/homelab.env
 /docker/*/data/
 /docker/*/db/
 
-# Everything in config/ except homepage configs and .example files
+# Everything in config/ except .example files
 /config/**
 !/config/**/
-!/config/homepage/config/services.yaml
-!/config/homepage/config/settings.yaml
-!/config/homepage/config/widgets.yaml
-!/config/homepage/config/bookmarks.yaml
-!/config/homepage/config/kubernetes.yaml
-!/config/homepage/config/docker.yaml
-!/config/homepage/config/custom.js
-!/config/homepage/config/custom.css
 !/config/**/*.example
 !/config/caddy/Caddyfile
 !/config/caddy/README.md
@@ -46,3 +38,7 @@ secrets/homelab.env
 !/config/caddy/crossroute.service
 !/config/caddy/check_caddy.sh
 !/config/caddy/keepalived.conf.example
+
+# Local runtime data / legacy PVC snapshots copied into the repo — never commit
+/data/**
+.openclaude/

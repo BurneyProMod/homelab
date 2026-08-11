@@ -1,0 +1,38 @@
+---
+# Single-node k3s control plane — installs with embedded etcd for future scale-out.
+
+- name: Install k3s server
+  shell: |
+    INSTALL_K3S_VERSION={{ k3s_version }} curl -sfL https://get.k3s.io | sh -s - server \
+      --write-kubeconfig-mode 644 \
+      --disable traefik \
+      --disable servicelb \
+      --cluster-init \
+      --node-name {{ inventory_hostname }}
+  args:
+    creates: /usr/local/bin/k3s
+
+- name: Wait for k3s to be ready
+  command: k3s kubectl get nodes
+  register: k3s_ready
+  retries: 12
+  delay: 10
+  until: k3s_ready.rc == 0
+
+# ============================================================
+# Apply node labels and taints
+# ============================================================
+
+- name: Apply node labels
+  command: "k3s kubectl label node {{ inventory_hostname }} {{ item }} --overwrite"
+  loop: "{{ node_labels[inventory_hostname] | default([]) }}"
+  changed_when: false
+
+- name: Apply node taints
+  command: >
+    k3s kubectl taint node {{ inventory_hostname }}
+    {{ item.key }}={{ item.value }}:{{ item.effect }}
+    --overwrite
+  loop: "{{ node_taints[inventory_hostname] | default([]) }}"
+  when: node_taints[inventory_hostname] is defined
+  changed_when: false

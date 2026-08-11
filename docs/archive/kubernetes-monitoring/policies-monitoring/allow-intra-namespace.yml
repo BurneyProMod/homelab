@@ -1,0 +1,15 @@
+# Allow all ingress within the monitoring namespace.
+# Without this, default-deny would block Grafana->Prometheus and other
+# intra-namespace traffic.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-intra-namespace
+  namespace: monitoring
+spec:
+  podSelector: {}
+  ingress:
+  - from:
+    - podSelector: {}
+  policyTypes:
+  - Ingress

@@ -2,15 +2,12 @@ name: scanopy
 
 services:
   daemon:
-    image: ghcr.io/scanopy/scanopy/daemon:latest
+    image: ghcr.io/scanopy/scanopy/daemon:latest  # TODO: pin to versioned tag or sha256 digest when available
     container_name: scanopy-daemon
-    labels:
-      - homepage.group=Docker
-      - homepage.name=Scanopy
-      - homepage.description=Device scan worker and host discovery
-      - homepage.showStats=true
     network_mode: host
-    privileged: true
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
     restart: unless-stopped
     environment:
       SCANOPY_LOG_LEVEL: ${SCANOPY_LOG_LEVEL:-info}
@@ -26,11 +23,11 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
 
   postgres:
-    image: postgres:17-alpine
+    image: postgres:17.4-alpine
     environment:
       POSTGRES_DB: scanopy
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -43,9 +40,9 @@ services:
       - scanopy
 
   server:
-    image: ghcr.io/scanopy/scanopy/server:latest
+    image: ghcr.io/scanopy/scanopy/server:latest  # TODO: pin to versioned tag or sha256 digest when available
     labels:
-      - homepage.group=Docker
+      - homepage.group=Infrastructure
       - homepage.name=Scanopy
       - homepage.href=http://192.168.1.50:60072
       - homepage.description=Inventory and device scanning
@@ -53,7 +50,7 @@ services:
       - "60072:60072"
     environment:
       SCANOPY_LOG_LEVEL: ${SCANOPY_LOG_LEVEL:-info}
-      SCANOPY_DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-changeme}@postgres:5432/scanopy
+      SCANOPY_DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@postgres:5432/scanopy
       SCANOPY_WEB_EXTERNAL_PATH: /app/static
       SCANOPY_PUBLIC_URL: ${SCANOPY_PUBLIC_URL:-http://localhost:60072}
       SCANOPY_INTEGRATED_DAEMON_URL: http://host.docker.internal:60073

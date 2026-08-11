@@ -6,7 +6,7 @@ metadata:
 spec:
   accessModes:
   - ReadWriteOnce
-  storageClassName: nfs
+  storageClassName: local-path
   resources:
     requests:
       storage: 10Gi
@@ -18,6 +18,8 @@ metadata:
   namespace: tools
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: code-server
@@ -29,6 +31,12 @@ spec:
       containers:
       - name: code-server
         image: lscr.io/linuxserver/code-server:4.96.4
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: ["ALL"]
+          seccompProfile:
+            type: RuntimeDefault
         ports:
         - containerPort: 8443
         livenessProbe:
@@ -72,13 +80,6 @@ spec:
       - name: data
         persistentVolumeClaim:
           claimName: code-server-data
-      topologySpreadConstraints:
-      - maxSkew: 1
-        topologyKey: kubernetes.io/hostname
-        whenUnsatisfiable: DoNotSchedule
-        labelSelector:
-          matchLabels:
-            app: code-server
 ---
 apiVersion: v1
 kind: Service
@@ -86,43 +87,10 @@ metadata:
   name: code-server-svc
   namespace: tools
 spec:
+  type: NodePort
   selector:
     app: code-server
   ports:
   - port: 80
     targetPort: 8443
----
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: code-server
-  namespace: tools
-  annotations:
-    gethomepage.dev/enabled: 'true'
-    gethomepage.dev/name: VS Code
-    gethomepage.dev/group: Tools
-    gethomepage.dev/icon: code-server.png
-    gethomepage.dev/description: Browser-based VS Code
-    gethomepage.dev/siteMonitor: http://code-server-svc.tools.svc.cluster.local
-    gethomepage.dev/app: code-server
-    gethomepage.dev/pod-selector: ''
-    nginx.ingress.kubernetes.io/proxy-read-timeout: '3600'
-    nginx.ingress.kubernetes.io/proxy-send-timeout: '3600'
-    cert-manager.io/cluster-issuer: homelab-ca-issuer
-spec:
-  ingressClassName: nginx
-  rules:
-  - host: code.homelab.lan
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: code-server-svc
-            port:
-              number: 80
-  tls:
-  - hosts:
-    - code.homelab.lan
-    secretName: code-tls
+    nodePort: 30083

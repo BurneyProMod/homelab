@@ -1,0 +1,11 @@
+services:
+  caddy:
+    image: caddy:2.11.4-alpine
+    container_name: caddy
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - ./data:/data
+      - ./logs:/var/log/caddy
+      - ./certs:/data/certs:ro

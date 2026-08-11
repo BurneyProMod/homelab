@@ -1,0 +1,21 @@
+# https://filebrowserquantum.com
+services:
+  filebrowser:
+    image: gtstef/filebrowser:stable
+    container_name: filebrowser-quantum
+    restart: unless-stopped
+    labels:
+      - homepage.group=Infrastructure
+      - homepage.name=Files
+      - homepage.icon=filebrowser.png
+      - homepage.href=https://files.burney.network
+      - homepage.description=Web file manager
+    environment:
+      - FILEBROWSER_CONFIG=/home/filebrowser/config.yaml
+    ports:
+      - "192.168.1.64:8085:80"
+    volumes:
+      - /home:/srv/home
+      - /srv/burntv:/srv/burntv
+      - ./data:/home/filebrowser/data
+      - ./config.yaml:/home/filebrowser/config.yaml:ro

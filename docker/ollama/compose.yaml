@@ -1,0 +1,63 @@
+# Ollama local inference — burndev (single RTX 3080 Ti, 12 GB)
+#
+# Prerequisites on the host (one time):
+#   1. NVIDIA driver installed and working:      nvidia-smi
+#   2. NVIDIA Container Toolkit installed:        https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html
+#   3. Toolkit wired into Docker + daemon reload: sudo nvidia-ctk runtime configure --runtime=docker && sudo systemctl restart docker
+#   4. Verify GPU reaches containers:             docker run --rm --gpus all nvidia/cuda:12.6.0-base-ubuntu24.04 nvidia-smi
+#
+# Bring up:   docker compose up -d
+# Pull models (first run, see bootstrap below):
+#             docker compose exec ollama ollama pull qwen2.5:7b-instruct
+#             docker compose exec ollama ollama pull nomic-embed-text
+# Health:     curl http://localhost:11434/api/tags
+
+services:
+  ollama:
+    image: ollama/ollama:latest      # pin to a digest/tag once you settle on a version
+    container_name: ollama
+    restart: unless-stopped
+    labels:
+      - homepage.group=AI
+      - homepage.name=Ollama
+      - homepage.icon=ollama.png
+      - homepage.href=http://192.168.1.50:11434
+      - homepage.description=Local LLM inference (RTX 3080 Ti)
+      - homepage.showStats=true
+    ports:
+      - "11434:11434"                # expose on the host; firewall to your LAN/VLAN as needed
+    volumes:
+      - ollama-models:/root/.ollama  # models + manifests persist here
+    environment:
+      # Serve on all interfaces inside the container (required for the published port).
+      OLLAMA_HOST: "0.0.0.0:11434"
+      # Idle unload window. Finite on a single 12 GB card so models can swap without OOM.
+      # Do NOT set -1 here — pinning everything forever will exhaust VRAM.
+      OLLAMA_KEEP_ALIVE: "30m"
+      # How many models may stay resident at once. 2 lets a small embedder co-reside
+      # with one interactive/generation model. Raise only if VRAM headroom allows.
+      OLLAMA_MAX_LOADED_MODELS: "2"
+      # Per-model request concurrency. 1 is right for single-user batch/interactive use.
+      OLLAMA_NUM_PARALLEL: "4"
+      # Default context window. Recent Ollama honors this env; older builds ignore it,
+      # so the triage script also sets options.num_ctx per request as the reliable path.
+      OLLAMA_CONTEXT_LENGTH: "8192"
+      # Optional: point model storage elsewhere if /root/.ollama volume isn't wanted.
+      # OLLAMA_MODELS: "/root/.ollama/models"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all           # single GPU; "all" == the one 3080 Ti
+              capabilities: [gpu]
+    healthcheck:
+      # ollama ships a CLI in the image; `ollama ps` returns non-zero if the server is down.
+      test: ["CMD", "ollama", "ps"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+volumes:
+  ollama-models:

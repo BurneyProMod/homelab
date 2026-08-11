@@ -1,36 +1,21 @@
 services:
-    vikunja:
-        image: vikunja/vikunja:latest
-        labels:
-            - homepage.group=Docker
-            - homepage.name=Vikunja
-            - homepage.href=http://192.168.1.50:3456
-            - homepage.description=Task and project management
-        environment:
-            VIKUNJA_SERVICE_PUBLICURL: ${VIKUNJA_SERVICE_PUBLICURL}
-            VIKUNJA_DATABASE_HOST: ${VIKUNJA_DATABASE_HOST}
-            VIKUNJA_DATABASE_PASSWORD: ${VIKUNJA_DATABASE_PASSWORD}
-            VIKUNJA_DATABASE_TYPE: ${VIKUNJA_DATABASE_TYPE}
-            VIKUNJA_DATABASE_USER: ${VIKUNJA_DATABASE_USER}
-            VIKUNJA_DATABASE_DATABASE: ${VIKUNJA_DATABASE_DATABASE}
-            VIKUNJA_SERVICE_SECRET: ${VIKUNJA_SERVICE_SECRET}
-        ports:
-            - 3456:3456
-        volumes:
-            - /opt/docker/vikunja/files:/app/vikunja/files
-        depends_on:
-            db:
-                condition: service_healthy
-        restart: unless-stopped
-    db:
-        image: postgres:18
-        environment:
-            POSTGRES_PASSWORD: ${VIKUNJA_DATABASE_PASSWORD}
-            POSTGRES_USER: ${VIKUNJA_DATABASE_USER}
-        volumes:
-            - /opt/docker/vikunja/db:/var/lib/postgresql
-        restart: unless-stopped
-        healthcheck:
-            test: ["CMD-SHELL", "pg_isready -h localhost -U $$POSTGRES_USER"]
-            interval: 2s
-            start_period: 30s
+  vikunja:
+    image: vikunja/vikunja:2.3.0
+    env_file: .env
+    environment:
+      VIKUNJA_SERVICE_PUBLICURL: https://vikunja.burney.network/
+      VIKUNJA_DATABASE_PATH: /db/vikunja.db
+      VIKUNJA_DATABASE_TYPE: sqlite
+    ports:
+      - 3456:3456
+    volumes:
+      - ./files:/app/vikunja/files
+      - ./db:/db
+    restart: unless-stopped
+    labels:
+      - homepage.group=Productivity
+      - homepage.name=Vikunja
+      - homepage.icon=vikunja.png
+      - homepage.href=https://vikunja.burndev.lan
+      - homepage.description=Task management
+      - homepage.showStats=true

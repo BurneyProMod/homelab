@@ -1,24 +1,20 @@
 # Homelab
 
-Kubernetes homelab running on Proxmox, provisioned with Terraform + Ansible.
+Self-sufficient Kubernetes homelab running on a single bare-metal host, provisioned with Ansible.
 
 ## Server Inventory
 
 | Host | IP | Role | Notes |
 |------|----|------|------------------|
-| proxmox1 | 192.168.1.30 | Hypervisor | Lenovo 3136 |
-| proxmox2 | 192.168.1.31 | Hypervisor | Lenovo 3130 |
-| proxmox3 | 192.168.1.32 | Hypervisor | Lenovo 3135 |
-| k8s-cp-01 | 192.168.1.60 | k3s control plane | VM |
-| k8s-worker-01 | 192.168.1.61 | k3s worker | VM |
-| k8s-worker-02 | 192.168.1.62 | k3s worker | VM |
+| burndev | 192.168.1.50 | k3s server + worker | MSI X470 GAMING PLUS desktop — single-node cluster |
 | Synology NAS | 192.168.1.11 | NFS storage | NAS |
 | OPNsense | 192.168.1.1 | Gateway | Firewall/router |
 | kwsdisplay | - | - | Raspberry Pi 4 Model B Rev 1.5 |
 | kws-rpi-1 | - | - | Raspberry Pi 4 Model B Rev 1.5 |
-| burndev | - | - | MSI X470 GAMING PLUS desktop |
 
 ## Running Services
+
+### Kubernetes
 
 | App | URL | Description |
 |-----|-----|-------------|
@@ -26,53 +22,46 @@ Kubernetes homelab running on Proxmox, provisioned with Terraform + Ansible.
 | VS Code | `code.homelab.lan` | Browser-based IDE |
 | Trilium | `trilium.homelab.lan` | Notes |
 | Kanboard | `kanboard.homelab.lan` | Kanban board |
-| Termix | `termix.homelab.lan` | Web terminal |
-| Immich | `immich.homelab.lan` | Photo/video backup |
+| Omni-Tools | `tools.homelab.lan` | Utility suite |
 | Prometheus | `prometheus.homelab.lan` | Metrics |
 | Grafana | `grafana.homelab.lan` | Dashboards |
 
-Homepage also auto-discovers Docker services from the `docker/*/compose.yaml` stacks through a read-only Docker socket proxy at `192.168.1.50:2375`.
+### Docker
+
+| App | URL | Description |
+|-----|-----|-------------|
+| Immich | `immich.pve.lan` | Photo/video backup |
+| Vikunja | `vikunja.burndev.lan` | Task management |
+| Linkwarden | `linkwarden.burndev.lan` | Bookmark manager |
+| KaraKeep | `karakeep.burndev.lan` | Read-later / bookmarking |
+| LLDAP | `lldap.burndev.lan` | Lightweight LDAP |
+| Actual Budget | `actual.burndev.lan` | Budgeting |
+| Scanopy | `scanopy.burndev.lan` | Document scanning |
+| Rackpeek | `rackpeek.burndev.lan` | Rack monitoring |
+| DownTify | `downtify.burndev.lan` | Download tracker |
+| LLMeter | `llmeter.burndev.lan` | LLM monitoring |
+| Ollama | — | LLM serving (API only) |
+| FileBrowser Quantum | `files.burndev.lan` | Web file manager |
+
+Homepage auto-discovers Docker services from the `docker/*/compose.yaml` stacks through a read-only Docker socket proxy at `192.168.1.50:2375`.
 
 ## Stack
 
-- **Hypervisor**: Proxmox VE
-- **IaC**: Terraform (bpg/proxmox provider)
+- **Platform**: Bare-metal single-node
 - **Config management**: Ansible
-- **Kubernetes**: k3s v1.36.1 (Traefik & ServiceLB disabled)
-- **Ingress**: nginx-ingress
+- **Kubernetes**: k3s v1.36.1 (Traefik & ServiceLB disabled, embedded etcd)
+- **Ingress**: Caddy in `network_mode: host` (sole edge proxy, owns ports 80/443) — K8s services exposed via NodePort (30080-30088)
 
 ## Prerequisites
 
-- Terraform >= 1.5
 - Ansible >= 2.14 with `community.general` collection
 - kubectl
-- SSH key at `~/.ssh/id_ed25519`
-- Proxmox API token with VM provisioning privileges
+- SSH key at `~/.ssh/id_ed25519_npburney_burndev`
 - Synology NAS with NFS exported at `/volume1/homelab/k8s/`
 
 ## Deployment Order
 
-### 1. Provision VMs — Terraform
-
-```bash
-cd terraform
-cp terraform.tfvars.example terraform.tfvars
-# Set Proxmox API token via environment variable (NEVER commit it):
-export TF_VAR_proxmox_api_token="<user>@pve!<token-name>=<secret>"
-
-# Trust the Proxmox self-signed CA (do once):
-scp root@<proxmox-ip>:/etc/pve/pve-root-ca.pem /tmp/proxmox-ca.pem
-# Install to system trust store
-sudo cp /tmp/proxmox-ca.pem /usr/local/share/ca-certificates/proxmox.crt && sudo update-ca-certificates
-
-terraform init
-terraform plan
-terraform apply
-```
-
-Creates 3 VMs on the Proxmox cluster.
-
-### 2. Bootstrap Kubernetes — Ansible
+### 1. Bootstrap Kubernetes — Ansible
 
 ```bash
 cd ansible
@@ -82,18 +71,17 @@ ansible-playbook -i inventory/hosts.ini site.yml
 
 This runs the full bootstrap:
 - `common` role: disables swap, loads kernel modules, sets sysctl, installs dependencies, configures UFW firewall
-- `control_plane` role: installs k3s server on the control plane node
-- `worker` role: joins worker nodes to the cluster
+- `control_plane` role: installs k3s server with `--cluster-init` (embedded etcd) for future scale-out
 
-### 3. Install Cert-Manager (for TLS)
+### 2. Install Cert-Manager (for TLS)
 
 ```bash
 bash kubernetes/cert-manager/install-cert-manager.sh
 kubectl apply -f kubernetes/cert-manager/ca-issuer.yml
 ```
 
-All ingresses are pre-configured with TLS annotations. 
-Once cert-manager is running, certs are issued automatically.
+TLS is handled by Caddy at the edge (ports 80/443) using pre-provisioned certificates.
+K8s cert-manager provides the `homelab-ca-issuer` ClusterIssuer for internal K8s certificate needs.
 
 To trust certs in your browser, export the CA certificate:
 
@@ -103,24 +91,57 @@ kubectl get secret homelab-ca-secret -n cert-manager -o jsonpath='{.data.tls\.cr
 
 Import `homelab-ca.crt` into your OS/browser trust store.
 
-### 4. Deploy Apps — kubectl
+### 3. Install Platform Components
 
 ```bash
-# Copy secret examples into appsecret.yml.
-cp /PATH/TO/secret.example.yml /PATH/TO/secret.yml 
+bash scripts/install-nfs-provisioner.sh
+bash scripts/install-kube-prometheus-stack.sh
+bash scripts/install-blackbox-exporter.sh
+```
 
-# Edit secret file as needed.
+### 4. Deploy K8s Apps — kubectl
 
-# Apply secrets.
-kubectl apply -f /PATH/TO/secret.yml 
+```bash
+# Dry-run full deployment (safe validation)
+bash scripts/deploy-k8s.sh --dry-run
 
-kubectl apply -f kubernetes/namespaces/
-kubectl apply -f kubernetes/policies/
-kubectl apply -f kubernetes/apps/
-kubectl apply -f kubernetes/monitoring/
+# Apply manifests
+bash scripts/deploy-k8s.sh
+```
+
+Notes:
+- `scripts/deploy-k8s.sh` applies `kubernetes/policies/` recursively.
+- Example secret manifests (`*.example.yml`) are intentionally excluded from deploy.
+- `kubernetes/monitoring/blackbox-values.yml`, `kube-prometheus-stack-values.yml`, and `prometheus-additional-scrape.yml` are Helm values/snippets, not standalone Kubernetes resources.
+
+### 5. Deploy Docker Stacks
+
+```bash
+make deploy-docker
 ```
 
 ## Operations
+
+### Quick Reference (Makefile)
+
+```bash
+make validate          # Pre-flight checks (syntax, secrets, mounts, dry-runs)
+make bootstrap         # Ansible + platform installs
+make deploy-k8s        # Apply all K8s manifests
+make deploy-docker     # Start all Docker stacks
+make backup            # Full backup (repo + app data)
+make restore-dry-run   # Preview restore from NAS (no changes)
+make restore           # Restore app data from NAS (requires --force)
+```
+
+### Validate Before Deploying
+
+```bash
+make validate
+```
+
+Checks shell syntax, YAML lint, unpinned images, missing .env files, NAS mount,
+Docker compose config, kubectl dry-runs, and secrets in tracked files.
 
 ### Restore from Backup
 
@@ -128,27 +149,27 @@ The NAS backup at `/mnt/syn/backups/homelab` contains a full copy of this repo.
 To restore on a new machine:
 
 ```bash
-# 1. Restore the repo from NAS
-rsync -aHAX /mnt/syn/backups/homelab/ ~/dev/homelab/
+# 1. Preview repo restore from NAS (no changes)
+bash scripts/pull-from-nas-backup.sh --dry-run
 
-# 2. Verify backup log for last successful run
-cat ~/dev/homelab/scripts/backup.log
+# 2. Pull backup into local repo
+bash scripts/pull-from-nas-backup.sh --apply
 
-# 3. Re-run Terraform (no-op if VMs exist, validates state)
-cd ~/dev/homelab/terraform
-terraform init
-terraform plan
+# 3. Preview app-data restore
+bash scripts/restore-app-data.sh --dry-run
 
-# 4. Re-run Ansible (idempotent, checks cluster health)
+# 4. Restore app data (Docker volumes, databases, Caddy certs)
+bash scripts/restore-app-data.sh --force
+
+# 5. Re-run Ansible (idempotent, checks cluster health)
 cd ~/dev/homelab/ansible
 ansible-playbook site.yml
 
-# 5. Re-apply all K8s manifests (idempotent)
-kubectl apply -f kubernetes/namespaces/
-kubectl apply -f kubernetes/policies/
-kubectl apply -f kubernetes/apps/
-kubectl apply -f kubernetes/monitoring/
+# 6. Re-apply all K8s manifests (idempotent)
+bash ~/dev/homelab/scripts/deploy-k8s.sh
 ```
+
+Full recovery procedures are in [docs/runbook.md](docs/runbook.md).
 
 ## K8s Storage Classes
 
@@ -156,4 +177,3 @@ kubectl apply -f kubernetes/monitoring/
 |------|------------|---------|
 | `local-path` | rancher.io/local-path | Node-local storage (default) |
 | `nfs` | nfs-subdir-external-provisioner | Synology NAS |
-| `proxmox-local` | Proxmox CSI plugin | Proxmox local-lvm storage (requires Proxmox CSI driver installed on cluster) |

@@ -6,7 +6,7 @@ metadata:
 spec:
   accessModes:
   - ReadWriteOnce
-  storageClassName: nfs
+  storageClassName: local-path
   resources:
     requests:
       storage: 5Gi
@@ -18,6 +18,8 @@ metadata:
   namespace: tools
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: kanboard
@@ -29,6 +31,12 @@ spec:
       containers:
       - name: kanboard
         image: kanboard/kanboard:v1.2.43
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: ["ALL"]
+          seccompProfile:
+            type: RuntimeDefault
         ports:
         - containerPort: 80
         livenessProbe:
@@ -61,13 +69,6 @@ spec:
       - name: data
         persistentVolumeClaim:
           claimName: kanboard-data
-      topologySpreadConstraints:
-      - maxSkew: 1
-        topologyKey: kubernetes.io/hostname
-        whenUnsatisfiable: DoNotSchedule
-        labelSelector:
-          matchLabels:
-            app: kanboard
 ---
 apiVersion: v1
 kind: Service
@@ -75,42 +76,10 @@ metadata:
   name: kanboard-svc
   namespace: tools
 spec:
+  type: NodePort
   selector:
     app: kanboard
   ports:
   - port: 80
     targetPort: 80
----
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: kanboard
-  namespace: tools
-  annotations:
-    gethomepage.dev/enabled: 'true'
-    gethomepage.dev/name: Kanboard
-    gethomepage.dev/group: Tools
-    gethomepage.dev/icon: kanboard.png
-    gethomepage.dev/description: Kanban board
-    gethomepage.dev/href: http://kanboard.homelab.lan
-    gethomepage.dev/app: kanboard
-    gethomepage.dev/pod-selector: ''
-    gethomepage.dev/siteMonitor: http://kanboard-svc.tools.svc.cluster.local
-    cert-manager.io/cluster-issuer: homelab-ca-issuer
-spec:
-  ingressClassName: nginx
-  rules:
-  - host: kanboard.homelab.lan
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: kanboard-svc
-            port:
-              number: 80
-  tls:
-  - hosts:
-    - kanboard.homelab.lan
-    secretName: kanboard-tls
+    nodePort: 30084

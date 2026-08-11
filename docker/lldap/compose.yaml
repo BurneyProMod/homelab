@@ -1,0 +1,20 @@
+services:
+  lldap:
+    image: lldap/lldap:stable
+    env_file: .env
+    environment:
+      LLDAP_HTTP_PORT: 17170
+      LLDAP_LDAP_PORT: 3890
+      LLDAP_LDAP_BASE_DN: dc=burndev,dc=lan
+    ports:
+      - 3890:3890
+      - 17170:17170
+    volumes:
+      - ./data:/data
+    restart: unless-stopped
+    labels:
+      - homepage.group=Infrastructure
+      - homepage.name=LLDAP
+      - homepage.icon=lldap.png
+      - homepage.href=https://lldap.burndev.lan
+      - homepage.description=LDAP user directory

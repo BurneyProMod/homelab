@@ -1,0 +1,83 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: homarr-config
+  namespace: default
+data:
+  AUTH_PROVIDERS: oidc
+  AUTH_OIDC_CLIENT_ID: homarr
+  AUTH_OIDC_CLIENT_NAME: Authentik
+  AUTH_OIDC_ISSUER: https://auth.burney.network/application/o/homarr/
+  AUTH_OIDC_URI: https://auth.burney.network/application/o/authorize/
+  AUTH_OIDC_SCOPE_OVERWRITE: "openid email profile groups"
+  AUTH_OIDC_GROUPS_ATTRIBUTE: groups
+  AUTH_OIDC_AUTO_LOGIN: "true"
+  AUTH_LOGOUT_REDIRECT_URL: https://auth.burney.network/application/o/homarr/end-session/
+  NEXTAUTH_URL: https://homarr.burney.network
+  BASE_URL: https://homarr.burney.network
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: homarr-data
+  namespace: default
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 2Gi
+  storageClassName: local-path
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: homarr
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: homarr
+  template:
+    metadata:
+      labels:
+        app: homarr
+    spec:
+      containers:
+      - name: homarr
+        image: ghcr.io/homarr-labs/homarr:latest
+        ports:
+        - containerPort: 7575
+        envFrom:
+        - configMapRef:
+            name: homarr-config
+        - secretRef:
+            name: homarr-secret
+        volumeMounts:
+        - name: data
+          mountPath: /appdata
+        resources:
+          requests:
+            cpu: 200m
+            memory: 256Mi
+          limits:
+            cpu: 1000m
+            memory: 1536Mi
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: homarr-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: homarr-svc
+  namespace: default
+spec:
+  type: NodePort
+  selector:
+    app: homarr
+  ports:
+  - port: 80
+    targetPort: 7575
+    nodePort: 30085
