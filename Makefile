@@ -1,18 +1,7 @@
-.PHONY: validate bootstrap platform deploy-k8s deploy-docker backup backup-app restore-dry-run restore up
+.PHONY: validate deploy-k8s deploy-docker backup backup-app restore-dry-run restore up
 
 validate:
 	bash scripts/validate.sh
-
-bootstrap:
-	ansible-galaxy collection install -r requirements.yml
-	ansible-playbook ansible/site.yml
-
-platform:
-	bash kubernetes/cert-manager/install-cert-manager.sh
-	kubectl apply -f kubernetes/cert-manager/ca-issuer.yml
-	bash scripts/install-nfs-provisioner.sh
-	bash scripts/install-kube-prometheus-stack.sh
-	bash scripts/install-blackbox-exporter.sh
 
 up:
 	bash scripts/up.sh

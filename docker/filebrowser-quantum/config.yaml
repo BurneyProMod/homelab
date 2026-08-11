@@ -1,0 +1,34 @@
+# FileBrowser Quantum config.
+# This file in the repo is REDACTED. The deployed copy on LXC 114 (files)
+# lives in /opt/filebrowser/config.yaml and holds the real admin password and
+# LDAP bind password (git-ignored, see .gitignore).
+server:
+  port: 80
+  database: /home/filebrowser/data/database.db
+  cacheDir: /home/filebrowser/data/tmp
+  sources:
+    - path: /srv/home
+      name: "Home"
+      config:
+        defaultEnabled: true
+    - path: /srv/burntv
+      name: "Burntv"
+      config:
+        defaultEnabled: true
+
+auth:
+  adminUsername: admin
+  adminPassword: CHANGE_ME
+  methods:
+    password:
+      enabled: true
+      minLength: 4
+    ldap:
+      enabled: true
+      server: ldap://192.168.1.60:3890
+      baseDN: dc=burndev,dc=lan
+      userDN: uid=admin,ou=people,dc=burndev,dc=lan
+      userPassword: CHANGE_ME
+      userFilter: (&(uid=%s)(objectClass=person))
+      userIdentifier: uid
+      createUser: true

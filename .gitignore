@@ -42,3 +42,11 @@ secrets/homelab.env
 # Local runtime data / legacy PVC snapshots copied into the repo — never commit
 /data/**
 .openclaude/
+
+# llmeter build deps
+!/docker/llmeter/Dockerfile
+!/docker/llmeter/app.py
+# caddy edge config (HA pair; matches config/caddy/Caddyfile)
+!/docker/caddy/Caddyfile
+# filebrowser config (redacted; real config on LXC 114)
+!/docker/filebrowser-quantum/config.yaml
