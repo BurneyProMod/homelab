@@ -17,7 +17,7 @@ Live inventory from the 2026-08-06 audit, cross-referenced with the Trilium serv
 
 | Service | Host | URL |
 |---------|------|-----|
-| Immich v3.1.0 | pve-exu CT 111 | immich.pve.lan |
+| Immich | pve-exu CT 111 | immich.pve.lan |
 | Karakeep | pve-exu CT 113 | karakeep.pve.lan |
 | Vikunja | pve-exu CT 112 | vikunja.pve.lan |
 | RackPeek | pve-exu CT 112 | rackpeek.pve.lan |

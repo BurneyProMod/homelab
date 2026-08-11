@@ -11,7 +11,6 @@ deploy-k8s:
 
 deploy-docker:
 	cd docker/caddy       && docker compose up -d
-	cd docker/socket-proxy && docker compose up -d
 	cd docker/immich      && docker compose up -d
 	cd docker/vikunja     && docker compose up -d
 	cd docker/scanopy     && docker compose up -d

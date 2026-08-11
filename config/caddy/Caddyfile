@@ -12,7 +12,7 @@
 # for these names.
 
 {
-	email <redacted-email>
+	# ACME account email redacted for public repo
 	acme_ca https://acme-v02.api.letsencrypt.org/directory
 }
 

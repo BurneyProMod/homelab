@@ -109,7 +109,7 @@ All guests are running.
 
 | VMID | Name | Type | IP | Role |
 |---|---|---|---|---|
-| 111 | immich | LXC | 192.168.1.61 | Immich v3.1.0 (server, ML, postgres, valkey), :2283 |
+| 111 | immich | LXC | 192.168.1.61 | Immich (server, ML, postgres, valkey), :2283 |
 | 112 | docker-apps | LXC | 192.168.1.62 | Docker: Vikunja (:3456), RackPeek (:3001), Actual (:5006) |
 | 113 | archives | LXC | 192.168.1.63 | Docker: Karakeep, meilisearch, chrome, ollama-proxy (:3000) |
 | 116 | caddy | LXC | 192.168.1.41 | Main reverse proxy, `*.pve.lan` on :80/:443 |

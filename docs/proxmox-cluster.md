@@ -30,7 +30,7 @@ Single NFS4 export `/volume1/homelab` mounted at `/mnt/synology/homelab` on all 
 | ID | Name | Host | IP | vCPU | RAM | Disk | Services |
 |----|------|------|----|------|-----|------|----------|
 | 110 | identity | pve-core | 192.168.1.60 | 1c | 384M | 4G | LLDAP, OpenBao |
-| 111 | immich | pve-exu | 192.168.1.61 | 4c | 6G | 32G | Immich v3.1.0 |
+| 111 | immich | pve-exu | 192.168.1.61 | 4c | 6G | 32G | Immich |
 | 112 | docker-apps | pve-exu | 192.168.1.62 | 2c | 3G | 32G | Vikunja, Actual Budget, RackPeek |
 | 113 | archives | pve-exu | 192.168.1.63 | 4c | 4G | 32G | Karakeep (+chrome, meilisearch) |
 | 114 | files | pve-core | 192.168.1.64 | 1c | 512M | 4G | FileBrowser Quantum |
