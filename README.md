@@ -20,8 +20,8 @@ Internet → OPNsense (192.168.1.1)
    │         │                          │
  Proxmox cluster            Docker LXCs            K3s cluster (3 VMs)
  pve-core .30               (per-service LXCs)     k3s-core .70, k3s-exu .71,
- pve-gpu  .31                                    k3s-gpu .72 (NodePorts 30080+)
- pve-exu  .32
+ pve-gpu  .32                                    k3s-gpu .72 (NodePorts 30080+)
+ pve-exu  .31
 ```
 
 | Host | IP | Role |
@@ -29,11 +29,11 @@ Internet → OPNsense (192.168.1.1)
 | OPNsense | 192.168.1.1 | Gateway, firewall, DNS, DHCP |
 | Synology NAS | 192.168.1.11 | NFS storage (`/volume1/homelab`), critical backups |
 | pve-core | 192.168.1.30 | Proxmox host; hub (repo mount, Caddy LXC 103, SSO LXCs) |
-| pve-gpu | 192.168.1.31 | Proxmox host; Jellyfin/VA-API, Servarr stack, Caddy LXC 101 |
-| pve-exu | 192.168.1.32 | Proxmox host; Immich, Vikunja, Karakeep, Paperless, Stash, Scrutiny |
+| pve-gpu | 192.168.1.32 | Proxmox host; Jellyfin/VA-API, Servarr stack, Caddy LXC 101 |
+| pve-exu | 192.168.1.31 | Proxmox host; Immich, Vikunja, Karakeep, Paperless, Stash, Scrutiny |
 | burndev | 192.168.1.50 | Local LLM (Ollama), `burntv` NFS media share (mergerfs pool) |
 | k3s-core / k3s-exu / k3s-gpu | .70 / .71 / .72 | 3-node k3s (all control-plane, `local-path` storage) |
-| kwsdisplay | 192.168.1.168 | Rack kiosk: Prometheus, Grafana, Uptime-Kuma, blackbox |
+| kwsdisplay | 192.168.1.168 | Rack kiosk: Prometheus, Grafana, Loki, blackbox |
 | kws-rpi-1 | — | UniFi Controller |
 | homeassistant | — | Home Assistant, ESPHome, Zigbee |
 

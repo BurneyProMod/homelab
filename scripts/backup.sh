@@ -1,32 +1,28 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Off-site repo backup: push the canonical repo to the GitHub remote.
+#
+# The canonical copy lives on the NAS. The old rsync --delete mirror was
+# removed because a stale local checkout mirrored with --delete could clobber
+# the canonical copy: the self-mirror guard tested identity (source == dest)
+# not direction, so any host mounting the NAS at a different path (burndev:
+# /mnt/syn) bypassed it. Git push is content-addressed and cannot do that.
+#
+# Runs from `make backup` and from burndev's weekly cron (which holds the
+# GitHub deploy key). Warn-don't-fail: a push error must never block the
+# app-data backup that `make backup` runs next.
+
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-source "$REPO_DIR/scripts/lib-paths.sh"
 LOG_FILE="${LOG_FILE:-/home/npburney/.local/state/homelab/backup.log}"
 mkdir -p "$(dirname "$LOG_FILE")"
 
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "$LOG_FILE"; }
 
-log "Starting homelab repo backup"
+log "Starting homelab repo backup (off-site push)"
 
-if ! mountpoint -q "$NAS_ROOT"; then
-  log "ERROR: NAS not mounted at $NAS_ROOT. Backup aborted."
-  exit 1
+if ! GIT_TERMINAL_PROMPT=0 git -C "$REPO_DIR" push origin main 2>>"$LOG_FILE"; then
+  log "WARN: push to origin failed (repo still safe on NAS)"
+else
+  log "Repo backup complete (pushed to origin)"
 fi
-
-# The canonical repo already lives on the NAS (REPO_MIRROR == REPO_DIR when run
-# from the NAS mount). In that case there is nothing to mirror; the off-site
-# copy is the GitHub remote. Only mirror when the working copy is elsewhere.
-if [[ "$(readlink -f "$REPO_DIR")" == "$(readlink -f "$REPO_MIRROR")" ]]; then
-  log "Repo is canonical on the NAS ($REPO_MIRROR); off-site copy is GitHub. Nothing to mirror."
-  log "Repo backup complete (skipped self-mirror)"
-  exit 0
-fi
-
-mkdir -p "$REPO_MIRROR"
-
-rsync -aHAX --no-owner --no-group --delete --exclude="/docker/*/data/" --exclude="/docker/*/*/data/" --exclude="/docker/*/db/" --exclude="/docker/*/pgdata/" --exclude="/docker/*/meili_data/" --info=progress2 \
-  "$REPO_DIR/" "$REPO_MIRROR/"
-
-log "Backup complete"

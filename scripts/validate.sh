@@ -43,10 +43,28 @@ fi
 # ── Script smoke test (--dry-run parse) ──
 # Each script must accept --dry-run and reach its exit path. A script that dies
 # during init (e.g. unbound-variable from misordered lines) exits non-zero with
-# a shell error; environmental prerequisites (no kubectl, NAS unmounted) are
-# skipped, not failed.
+# a shell error; environmental prerequisites (wrong kubectl context, NAS
+# unmounted) are skipped, not failed.
+#
+# deploy-k8s.sh needs kubectl. When kubectl is absent, a stub kubectl is put on
+# PATH so the script still walks its full apply path (the stub answers the
+# context/server queries lib-context.sh makes, and succeeds on apply).
 
 header "Script smoke test (--dry-run parse)"
+STUB_DIR=""
+if ! command -v kubectl >/dev/null 2>&1; then
+  STUB_DIR="$(mktemp -d)"
+  cat > "$STUB_DIR/kubectl" <<'KUBECTL_STUB'
+#!/bin/sh
+case "$*" in
+"config current-context") echo default ;;
+*jsonpath*) echo https://192.168.1.70:6443 ;;
+*) exit 0 ;;
+esac
+KUBECTL_STUB
+  chmod +x "$STUB_DIR/kubectl"
+  PATH="$STUB_DIR:$PATH"
+fi
 for f in scripts/deploy-k8s.sh scripts/backup-app-data.sh scripts/restore-app-data.sh; do
   set +e
   out=$(timeout 10 bash "$f" --dry-run 2>&1)
@@ -54,12 +72,16 @@ for f in scripts/deploy-k8s.sh scripts/backup-app-data.sh scripts/restore-app-da
   set -e
   if [ "$rc" -eq 0 ]; then
     ok "$f"
-  elif grep -qiE "kubectl not found|not mounted|no cluster access|current-context" <<<"$out"; then
+  elif grep -qiE "kubectl not found|not mounted|no cluster access|kubectl context is" <<<"$out"; then
     echo "  SKIP  $f (environment: $(head -1 <<<"$out"))"
   else
     fail "$f (dies on --dry-run, exit $rc)"
   fi
 done
+if [ -n "$STUB_DIR" ]; then
+  PATH="${PATH#"$STUB_DIR":}"
+  rm -rf "$STUB_DIR"
+fi
 
 # ── YAML parse / lint ────────────────────────────────────────────────────────
 

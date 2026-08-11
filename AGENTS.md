@@ -9,7 +9,8 @@ are the current source of truth. If a doc here contradicts `docs/proxmox-cluster
 
 - Branch: `main`. Remote: `git@github.com:BurneyProMod/homelab.git`.
 - Canonical copy: Synology NAS, mounted on `pve-core` at
-  `/mnt/synology/homelab/repo`. Edit it there; `git push` is human-only.
+  `/mnt/synology/homelab/repo`. Edit it there. Off-site copy is the GitHub
+  remote; `scripts/backup.sh` pushes it (warn-don't-fail, see below).
 - Repo layout: `docker/` (compose stacks), `kubernetes/` (k3s manifests),
   `config/caddy/` + `config/step-ca/`, `scripts/`, `docs/`, `secrets/` (gitignored),
   `Makefile`.
@@ -54,8 +55,9 @@ Single source: `scripts/lib-paths.sh` — source it, never hardcode NAS paths.
   (cron daily 04:00). `--dry-run` is local-only. Exits non-zero on any failure.
 - `scripts/restore-app-data.sh` — MANUAL ONLY, never scheduled. Dry-run by
   default; `--force` + typed `yes` required.
-- `scripts/backup.sh` — repo mirror to `$REPO_MIRROR`. When run from the NAS
-  canonical copy it detects source==target and exits 0 (off-site copy is GitHub).
+- `scripts/backup.sh` — off-site repo backup: `git push origin main`.
+  Warn-don't-fail: a push error logs WARN and exits 0, never blocking
+  `make backup`'s app-data step. The canonical repo stays on the NAS either way.
 - `scripts/check-k8s.sh` — rollout verification + failing pods + URL summary.
 - Makefile targets that EXIST: `validate`, `up`, `deploy-k8s`, `deploy-docker`,
   `backup`, `backup-app`, `restore-dry-run`, `restore`. There is no
