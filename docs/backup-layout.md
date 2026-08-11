@@ -53,3 +53,29 @@ PVE vzdump jobs (`/etc/pve/jobs.cfg`): daily 02:00, keep-last 2, per-node storag
 - Repo/secrets: rsync `/mnt/syn/repo/` back; `--delete` safe.
 - vzdump: restore via Proxmox UI or `vzdump --restore`.
 - Home Assistant: restore tar via the HA UI (Settings > Backups > Upload).
+
+## App-data backup (host-aware, runner = ops LXC 115)
+
+Since 2026-08-11 the per-service app-data backup is host-aware and runs from
+the **operations LXC 115** (192.168.1.65) via a dedicated SSH key
+(`~/.ssh/id_ed25519_backup`) distributed to the docker/native LXCs and k3s
+nodes. It writes to `backups/homelab/` on the Synology:
+
+```
+backups/homelab/
+  docker/<label>/            compose project dirs (bind-mounted data + configs)
+  docker/<label>/volumes/    named docker volumes (_data)
+  native/<label>/            native (non-docker) service data (/var/lib/jellyfin, /var/lib/sonarr, /etc/caddy ...)
+  k8s/<node>/                local-path PVC storage per k3s node (k3s-core/exu/gpu)
+  postgres/<label>/          pg_dumpall / pg_dump SQL dumps (retention: 7)
+```
+
+- Script: `scripts/backup-app-data.sh` (runs from the repo on the NAS mount).
+- Schedule: LXC 115 crontab, daily 04:00
+  (`bash /mnt/synology/homelab/repo/scripts/backup-app-data.sh`).
+- Guest access: direct SSH to LAN guests; media VLAN (10.30.0.0/24) guests via
+  the caddy LXC 101 (192.168.1.40) as ProxyJump; k3s PVCs rsync with
+  `--rsync-path="sudo rsync"` (npburney).
+- Restore: `scripts/restore-app-data.sh` — **manual only, never scheduled**,
+  dry-run default, requires `--force` + interactive confirmation.
+- Backup root owned by the runner UID (100000) so the unprivileged LXC can write.

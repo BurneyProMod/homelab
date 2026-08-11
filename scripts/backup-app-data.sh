@@ -1,116 +1,164 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Backs up Docker volume data, Postgres databases, Caddy certs, and K8s PVCs
-# to /mnt/syn/backups/homelab/. Requires /mnt/syn to be mounted.
+# Host-aware app-data backup for the current homelab (Proxmox LXCs + 3-node k3s).
+# Runs on the ops runner LXC 115 (operations), which has the NAS mount and the
+# dedicated backup-runner SSH key (~/.ssh/id_ed25519_backup).
+#
+# Layout written under $BACKUP_ROOT:
+#   docker/<label>/    compose project dirs (bind-mounted data + configs)
+#   docker/<label>/volumes/<name>/   named docker volumes (_data)
+#   native/<label>/    native (non-docker) service data dirs
+#   postgres/<label>/  pg_dumpall SQL dumps (crash-consistent, belt & suspenders)
+#   k8s/<node>/        local-path PVC storage per k3s node
+#
+# Usage: bash scripts/backup-app-data.sh [--dry-run]
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-BACKUP_ROOT="/mnt/syn/backups/homelab"
-LOG_FILE="$REPO_DIR/scripts/backup-app-data.log"
-TIMESTAMP="$(date '+%Y%m%d-%H%M%S')"
+BACKUP_ROOT="/mnt/synology/homelab/backups/homelab"
+LOG_FILE="/var/log/backup-app-data.log"
+DRY_RUN=false
+[ "${1:-}" = "--dry-run" ] && DRY_RUN=true
+
+SSH_OPTS=(-o BatchMode=yes -o ConnectTimeout=8)
+RSYNC_SSH="ssh ${SSH_OPTS[*]}"
 
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "$LOG_FILE"; }
 
-log "Starting app-data backup"
-
-if ! mountpoint -q /mnt/syn; then
-  log "ERROR: /mnt/syn is not mounted. Backup aborted."
+if ! mountpoint -q /mnt/synology/homelab; then
+  log "ERROR: NAS not mounted at /mnt/synology/homelab. Aborting."
   exit 1
 fi
 
-# ── Docker volume directories ────────────────────────────────────────────────
-
-DOCKER_VOLUMES=(
-  "/opt/docker/immich"
-  "/opt/docker/jellyfin/data"
-  "/opt/docker/servarr"
-  "/opt/docker/vikunja/files"
-  "/opt/docker/vikunja/db"
-  "/opt/docker/cannery/cannery/data"
-  "/opt/docker/scanopy/data"
-  "/opt/docker/actual-budget/data"
-  "/opt/docker/rackpeek/data"
+# ── Manifest ──────────────────────────────────────────────────────────────────
+# label|target|jump|type|source-dirs(space sep)
+# type: docker = compose project dirs + named volumes; native = data dirs only
+# jump: "-" or "root@192.168.1.40" (caddy LXC 101 bridges to the 10.30.0.0/24 media VLAN)
+GUESTS=(
+  "caddy-core|root@192.168.1.42|-|native|/etc/caddy /var/lib/caddy"
+  "identity|root@192.168.1.60|-|docker|/home/npburney/docker/lldap /home/npburney/docker/openbao"
+  "files|root@192.168.1.64|-|docker|/opt/filebrowser"
+  "authentik|root@192.168.1.66|-|docker|/opt/authentik"
+  "immich|root@192.168.1.61|-|docker|/home/npburney/immich"
+  "apps|root@192.168.1.62|-|docker|/home/npburney/docker/vikunja /home/npburney/docker/rackpeek /home/npburney/docker/actual-budget /home/npburney/docker/tasks-md"
+  "archives|root@192.168.1.63|-|docker|/home/npburney/docker/karakeep"
+  "paperless|root@192.168.1.67|-|docker|/home/npburney/docker/paperless"
+  "stash|root@192.168.1.68|-|docker|/home/npburney/docker/stash"
+  "scrutiny|root@192.168.1.69|-|docker|/home/npburney/docker/scrutiny"
+  "jellyfin|root@192.168.1.187|-|native|/var/lib/jellyfin"
+  "caddy-gpu|root@192.168.1.40|-|native|/etc/caddy /var/lib/caddy"
+  "sonarr|root@10.30.0.11|root@192.168.1.40|native|/var/lib/sonarr"
+  "radarr|root@10.30.0.12|root@192.168.1.40|native|/var/lib/radarr"
+  "lidarr|root@10.30.0.13|root@192.168.1.40|native|/var/lib/lidarr"
+  "prowlarr|root@10.30.0.14|root@192.168.1.40|native|/var/lib/prowlarr"
+  "qbit|root@10.30.0.15|root@192.168.1.40|docker|/opt/qbit-vpn"
 )
 
-log "Backing up Docker volumes"
-for src in "${DOCKER_VOLUMES[@]}"; do
-  if [ -d "$src" ]; then
-    dest="$BACKUP_ROOT/docker-volumes${src}"
-    mkdir -p "$(dirname "$dest")"
-    rsync -aHAX --no-owner --no-group --delete --info=progress2 "$src/" "$dest/"
-    log "  OK: $src"
+# postgres dumps: label|target|container (discovered per guest below)
+PG_TARGETS=(
+  "immich|root@192.168.1.61"
+  "paperless|root@192.168.1.67"
+  "authentik|root@192.168.1.66"
+)
+
+K3S_NODES=(
+  "k3s-core|npburney@192.168.1.70"
+  "k3s-exu|npburney@192.168.1.71"
+  "k3s-gpu|npburney@192.168.1.72"
+)
+
+ssh_run() { # target [jump] command...
+  local target="$1" jump="$2"; shift 2
+  if [ "$jump" != "-" ]; then
+    ssh "${SSH_OPTS[@]}" -J "$jump" "$target" "$@"
   else
-    log "  SKIP: $src (not found)"
-  fi
-done
-
-# ── Postgres databases ───────────────────────────────────────────────────────
-
-PG_BACKUP_DIR="$BACKUP_ROOT/postgres-dumps"
-mkdir -p "$PG_BACKUP_DIR"
-
-# Helper: pg_dump via docker exec if container is running
-dump_pg() {
-  local container="$1" db="$2" user="${3:-postgres}"
-  if docker inspect "$container" --format '{{.State.Running}}' 2>/dev/null | grep -q true; then
-    local outfile="$PG_BACKUP_DIR/${db}_${TIMESTAMP}.sql"
-    docker exec "$container" pg_dump -U "$user" -d "$db" > "$outfile"
-    if [[ -s "$outfile" ]] && ! grep -q 'pg_dump: error' "$outfile"; then
-      log "  OK: $db (from $container)"
-    else
-      log "  FAIL: $db dump is empty or contains errors"
-      rm -f "$outfile"
-    fi
-  else
-    log "  SKIP: $container not running, cannot dump $db"
+    ssh "${SSH_OPTS[@]}" "$target" "$@"
   fi
 }
 
-log "Dumping Postgres databases"
-dump_pg "immich_postgres"      "immich"   "postgres"
-dump_pg "vikunja-db-1"         "vikunja"  "vikunja"
-dump_pg "cannery-db"           "cannery"  "postgres"
-dump_pg "scanopy-postgres-1"   "scanopy"  "postgres"
+rsync_from() { # target jump src dest
+  local target="$1" jump="$2" src="$3" dest="$4"
+  if [ "$jump" != "-" ]; then
+    rsync -aHAX --no-owner --no-group --delete -e "ssh ${SSH_OPTS[*]} -J $jump" "$target:$src/" "$dest/"
+  else
+    rsync -aHAX --no-owner --no-group --delete -e "ssh ${SSH_OPTS[*]}" "$target:$src/" "$dest/"
+  fi
+}
 
-# Rotate old dumps: keep last 7 per database
-for db in immich vikunja cannery scanopy; do
-  ls -1t "$PG_BACKUP_DIR/${db}_"*.sql 2>/dev/null | tail -n +8 | xargs -r rm -f
+# ── Docker / native guests ────────────────────────────────────────────────────
+
+for entry in "${GUESTS[@]}"; do
+  IFS='|' read -r label target jump type sources <<< "$entry"
+  base="$BACKUP_ROOT/$type/$label"
+  log "== $label ($target) =="
+  for src in $sources; do
+    dest="$base/$(basename "$src")"
+    mkdir -p "$dest"
+    log "  rsync $src -> $dest"
+    if ! $DRY_RUN; then
+      if ! rsync_from "$target" "$jump" "$src" "$dest" 2>>"$LOG_FILE"; then
+        log "  WARN: rsync failed for $src (host down or path missing?)"
+      fi
+    fi
+  done
+  if [ "$type" = "docker" ] && ! $DRY_RUN; then
+    vols=$(ssh_run "$target" "$jump" "docker volume ls -q 2>/dev/null | grep -vE '^[0-9a-f]{64}$'" 2>/dev/null || true)
+    for v in $vols; do
+      vdest="$base/volumes/$v"
+      mkdir -p "$vdest"
+      log "  volume $v"
+      if ! rsync_from "$target" "$jump" "/var/lib/docker/volumes/$v/_data" "$vdest" 2>>"$LOG_FILE"; then
+        log "  WARN: volume rsync failed for $v"
+      fi
+    done
+  fi
 done
 
-# ── Caddy certs and data ─────────────────────────────────────────────────────
+# ── Postgres dumps ────────────────────────────────────────────────────────────
 
-CADDY_SRC="/opt/docker/caddy"
-CADDY_DEST="$BACKUP_ROOT/caddy"
-if [ -d "$CADDY_SRC" ]; then
-  log "Backing up Caddy certs and data"
-  mkdir -p "$CADDY_DEST"
-  rsync -aHAX --no-owner --no-group --delete --info=progress2 \
-    "$CADDY_SRC/certs/" "$CADDY_DEST/certs/"
-  rsync -aHAX --no-owner --no-group --delete --info=progress2 \
-    "$CADDY_SRC/data/" "$CADDY_DEST/data/"
-  log "  OK: Caddy"
-else
-  log "  SKIP: /opt/docker/caddy not found"
-fi
+for entry in "${PG_TARGETS[@]}"; do
+  IFS='|' read -r label target <<< "$entry"
+  jump="-"   # all pg guests are on the LAN (no jump needed)
+  container=$(ssh_run "$target" "$jump" "docker ps --format {{.Names}} 2>/dev/null | grep -iE 'postgres|pgsql|db' | head -1" 2>/dev/null || true)
+  if [ -z "$container" ]; then
+    log "== $label: no postgres container, skipping dump =="
+    continue
+  fi
+  dest="$BACKUP_ROOT/postgres/$label"
+  mkdir -p "$dest"
+  out="$dest/all_$(date '+%Y%m%d-%H%M%S').sql"
+  log "== $label: pg_dumpall from $container =="
+  if ! $DRY_RUN; then
+    if ssh_run "$target" "$jump" "docker exec $container pg_dumpall -U postgres 2>/dev/null" > "$out" && [ -s "$out" ]; then
+      log "  OK: $out ($(du -h "$out" | cut -f1))"
+      ls -1t "$dest"/all_*.sql 2>/dev/null | tail -n +8 | xargs -r rm -f   # keep last 7
+    else
+      # Fallback: dump the app-named database with the app-named user.
+      rm -f "$out"
+      if ssh_run "$target" "$jump" "docker exec $container pg_dump -U $label -d $label 2>/dev/null" > "$out" && [ -s "$out" ]; then
+        log "  OK (fallback user): $out ($(du -h "$out" | cut -f1))"
+      else
+        log "  WARN: pg_dumpall/pg_dump failed for $label (raw volume copy still covers this)"
+        rm -f "$out"
+      fi
+    fi
+  fi
+done
 
-# ── K8s PVCs ─────────────────────────────────────────────────────────────────
-# PVC data for stateful apps lives on the node's filesystem.
-# For local-path StorageClass, PVCs are in /var/lib/rancher/k3s/storage/
+# ── k3s PVC storage ───────────────────────────────────────────────────────────
 
-PVC_SRC="/var/lib/rancher/k3s/storage"
-PVC_DEST="$BACKUP_ROOT/k8s-pvcs"
+for entry in "${K3S_NODES[@]}"; do
+  IFS='|' read -r label target <<< "$entry"
+  dest="$BACKUP_ROOT/k8s/$label"
+  mkdir -p "$dest"
+  log "== k3s PVCs: $label ($target) =="
+  if ! $DRY_RUN; then
+    if ! rsync -aHAX --no-owner --no-group --delete --rsync-path="sudo rsync" -e "ssh ${SSH_OPTS[*]}" \
+        "$target:/var/lib/rancher/k3s/storage/" "$dest/" 2>>"$LOG_FILE"; then
+      log "  WARN: k3s rsync failed for $label"
+    fi
+  fi
+done
 
-if [ -d "$PVC_SRC" ]; then
-  log "Backing up K8s PVCs (local-path)"
-  mkdir -p "$PVC_DEST"
-  rsync -aHAX --no-owner --no-group --delete --info=progress2 \
-    "$PVC_SRC/" "$PVC_DEST/"
-  log "  OK: K8s PVCs"
-else
-  log "  SKIP: $PVC_SRC not found"
-fi
-
-# ── Summary ───────────────────────────────────────────────────────────────────
-
-BACKUP_SIZE="$(du -sh "$BACKUP_ROOT" 2>/dev/null | cut -f1)"
-log "App-data backup complete ($BACKUP_SIZE on disk)"
+SIZE="$(du -sh "$BACKUP_ROOT" 2>/dev/null | cut -f1)"
+log "App-data backup complete ($SIZE on disk)"
