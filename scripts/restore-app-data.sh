@@ -34,6 +34,16 @@ if ! mountpoint -q /mnt/syn; then
   exit 1
 fi
 
+# Guard: kubectl must point at the homelab k3s cluster.
+source "$REPO_DIR/scripts/lib-context.sh"
+require_k3s_context
+
+# Namespaces with PVC-backed workloads. NOTE: monitoring no longer exists on
+# the live cluster; default (homarr, homebox, manyfold, changedetection) and
+# tools (code-server, kanboard, omni-tools, trilium) must both be scaled down
+# before PVC data is overwritten.
+K8S_NAMESPACES="default tools"
+
 # ── Pre-flight checks ────────────────────────────────────────────────────────
 
 log "Checking backup availability"
@@ -110,29 +120,35 @@ log "  Dumps are in: $BACKUP_ROOT/postgres-dumps/"
 
 log "Restoring K8s PVCs"
 if [ -d "$BACKUP_ROOT/k8s-pvcs" ]; then
-  log "  Scaling down K8s workloads first..."
+  log "  Scaling down K8s workloads (deployments AND statefulsets) in: $K8S_NAMESPACES"
   declare -A ORIG_REPLICAS
-  for ns in tools monitoring; do
-    for deploy in $(kubectl -n "$ns" get deploy -o name 2>/dev/null | cut -d/ -f2); do
-      rep=$(kubectl -n "$ns" get deploy "$deploy" -o jsonpath='{.spec.replicas}' 2>/dev/null || echo 0)
-      ORIG_REPLICAS["${ns}/${deploy}"]=$rep
+  for ns in $K8S_NAMESPACES; do
+    for kind in deploy statefulset; do
+      for name in $(kubectl -n "$ns" get "$kind" -o name 2>/dev/null | cut -d/ -f2); do
+        rep=$(kubectl -n "$ns" get "$kind" "$name" -o jsonpath='{.spec.replicas}' 2>/dev/null || echo 0)
+        ORIG_REPLICAS["${ns}/${kind}/${name}"]=$rep
+        log "    recording ${ns}/${kind}/${name} replicas=$rep"
+      done
     done
     kubectl -n "$ns" scale deployment --all --replicas=0 2>/dev/null || true
     kubectl -n "$ns" scale statefulset --all --replicas=0 2>/dev/null || true
   done
   log "  Waiting for pods to terminate..."
-  for ns in tools monitoring; do
+  for ns in $K8S_NAMESPACES; do
     kubectl -n "$ns" wait --for=delete pod --all --timeout=120s 2>/dev/null || true
   done
   log "  Copying PVC data..."
   mkdir -p /var/lib/rancher/k3s/storage
   rsync -aHAX --no-owner --no-group --info=progress2 \
     "$BACKUP_ROOT/k8s-pvcs/" /var/lib/rancher/k3s/storage/
-  log "  Scaling workloads back up..."
-  for ns in tools monitoring; do
-    for deploy in $(kubectl -n "$ns" get deploy -o name 2>/dev/null | cut -d/ -f2); do
-      rep="${ORIG_REPLICAS[${ns}/${deploy}]:-1}"
-      kubectl -n "$ns" scale deploy "$deploy" --replicas="$rep" 2>/dev/null || true
+  log "  Scaling workloads back up (deployments AND statefulsets)..."
+  for ns in $K8S_NAMESPACES; do
+    for kind in deploy statefulset; do
+      for name in $(kubectl -n "$ns" get "$kind" -o name 2>/dev/null | cut -d/ -f2); do
+        rep="${ORIG_REPLICAS[${ns}/${kind}/${name}]:-1}"
+        log "    restoring ${ns}/${kind}/${name} replicas=$rep"
+        kubectl -n "$ns" scale "$kind" "$name" --replicas="$rep" 2>/dev/null || true
+      done
     done
   done
 fi

@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$REPO_DIR/scripts/lib-context.sh"
+require_k3s_context
 SERVER_IP="${SERVER_IP:-192.168.1.71}"
 
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }

@@ -51,7 +51,10 @@ spec:
         - name: PGID
           value: "1000"
         - name: SECRET_KEY_BASE
-          value: "<rotated-secret>"
+          valueFrom:
+            secretKeyRef:
+              name: manyfold-secret
+              key: SECRET_KEY_BASE
         - name: REDIS_URL
           value: redis://manyfold-redis:6379/1
         - name: DATABASE_ADAPTER
