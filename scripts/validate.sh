@@ -6,6 +6,7 @@ set -euo pipefail
 # tracked files, missing env files, unpinned images, stale mounts.
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$REPO_DIR/scripts/lib-paths.sh"
 cd "$REPO_DIR"
 
 PASS=0
@@ -38,6 +39,27 @@ if command -v shellcheck >/dev/null 2>&1; then
     fi
   done
 fi
+
+# ── Script smoke test (--dry-run parse) ──
+# Each script must accept --dry-run and reach its exit path. A script that dies
+# during init (e.g. unbound-variable from misordered lines) exits non-zero with
+# a shell error; environmental prerequisites (no kubectl, NAS unmounted) are
+# skipped, not failed.
+
+header "Script smoke test (--dry-run parse)"
+for f in scripts/deploy-k8s.sh scripts/backup-app-data.sh scripts/restore-app-data.sh; do
+  set +e
+  out=$(timeout 10 bash "$f" --dry-run 2>&1)
+  rc=$?
+  set -e
+  if [ "$rc" -eq 0 ]; then
+    ok "$f"
+  elif grep -qiE "kubectl not found|not mounted|no cluster access|current-context" <<<"$out"; then
+    echo "  SKIP  $f (environment: $(head -1 <<<"$out"))"
+  else
+    fail "$f (dies on --dry-run, exit $rc)"
+  fi
+done
 
 # ── YAML parse / lint ────────────────────────────────────────────────────────
 
@@ -120,10 +142,10 @@ done
 # ── NAS mount ─────────────────────────────────────────────────────────────────
 
 header "NAS mount"
-if mountpoint -q /mnt/syn 2>/dev/null; then
-  ok "/mnt/syn mounted"
+if mountpoint -q "$NAS_ROOT" 2>/dev/null; then
+  ok "$NAS_ROOT mounted"
 else
-  fail "/mnt/syn not mounted"
+  fail "$NAS_ROOT not mounted"
 fi
 
 # ── Docker compose config parse ──────────────────────────────────────────────

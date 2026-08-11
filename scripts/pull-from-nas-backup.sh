@@ -2,12 +2,13 @@
 set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-# Repo mirror written by scripts/backup.sh (rsync of $REPO_DIR -> /mnt/syn/repo).
+source "$REPO_DIR/scripts/lib-paths.sh"
+# Repo mirror written by scripts/backup.sh (rsync of $REPO_DIR -> $REPO_MIRROR).
 # WARNING: do NOT point this at /mnt/syn/backups/homelab. That path is the
 # APP-DATA backup root (scripts/backup-app-data.sh: postgres dumps + PVC dirs).
 # Restoring it over the repo with --delete would replace the repository with
 # application data.
-BACKUP_DIR="/mnt/syn/repo"
+BACKUP_DIR="$REPO_MIRROR"
 MODE="dry-run"
 
 for arg in "$@"; do
@@ -26,8 +27,8 @@ for arg in "$@"; do
   esac
 done
 
-if ! mountpoint -q /mnt/syn; then
-  echo "ERROR: /mnt/syn is not mounted." >&2
+if ! mountpoint -q "$NAS_ROOT"; then
+  echo "ERROR: NAS not mounted at $NAS_ROOT." >&2
   exit 1
 fi
 

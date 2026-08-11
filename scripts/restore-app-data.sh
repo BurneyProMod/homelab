@@ -11,7 +11,7 @@ set -euo pipefail
 # Usage: bash scripts/restore-app-data.sh [--dry-run|--force] [--only LABEL]
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-BACKUP_ROOT="/mnt/synology/homelab/backups/homelab"
+source "$REPO_DIR/scripts/lib-paths.sh"
 LOG_FILE="/var/log/restore-app-data.log"
 DRY_RUN=true
 ONLY=""
@@ -32,8 +32,8 @@ done
 SSH_OPTS=(-o BatchMode=yes -o ConnectTimeout=8)
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "$LOG_FILE"; }
 
-if ! mountpoint -q /mnt/synology/homelab; then
-  log "ERROR: NAS not mounted at /mnt/synology/homelab. Aborting."
+if ! mountpoint -q "$NAS_ROOT"; then
+  log "ERROR: NAS not mounted at $NAS_ROOT. Aborting."
   exit 1
 fi
 

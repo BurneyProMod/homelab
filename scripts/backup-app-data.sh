@@ -15,7 +15,7 @@ set -euo pipefail
 # Usage: bash scripts/backup-app-data.sh [--dry-run]
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-BACKUP_ROOT="/mnt/synology/homelab/backups/homelab"
+source "$REPO_DIR/scripts/lib-paths.sh"
 LOG_FILE="/var/log/backup-app-data.log"
 DRY_RUN=false
 [ "${1:-}" = "--dry-run" ] && DRY_RUN=true
@@ -23,10 +23,13 @@ DRY_RUN=false
 SSH_OPTS=(-o BatchMode=yes -o ConnectTimeout=8)
 RSYNC_SSH="ssh ${SSH_OPTS[*]}"
 
+FAILURES=0
+warn() { log "  WARN: $*"; FAILURES=$((FAILURES + 1)); }
+
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "$LOG_FILE"; }
 
-if ! mountpoint -q /mnt/synology/homelab; then
-  log "ERROR: NAS not mounted at /mnt/synology/homelab. Aborting."
+if ! mountpoint -q "$NAS_ROOT"; then
+  log "ERROR: NAS not mounted at $NAS_ROOT. Aborting."
   exit 1
 fi
 
@@ -97,7 +100,7 @@ for entry in "${GUESTS[@]}"; do
     log "  rsync $src -> $dest"
     if ! $DRY_RUN; then
       if ! rsync_from "$target" "$jump" "$src" "$dest" 2>>"$LOG_FILE"; then
-        log "  WARN: rsync failed for $src (host down or path missing?)"
+        warn "rsync failed for $src (host down or path missing?)"
       fi
     fi
   done
@@ -108,7 +111,7 @@ for entry in "${GUESTS[@]}"; do
       mkdir -p "$vdest"
       log "  volume $v"
       if ! rsync_from "$target" "$jump" "/var/lib/docker/volumes/$v/_data" "$vdest" 2>>"$LOG_FILE"; then
-        log "  WARN: volume rsync failed for $v"
+        warn "volume rsync failed for $v"
       fi
     done
   fi
@@ -119,28 +122,30 @@ done
 for entry in "${PG_TARGETS[@]}"; do
   IFS='|' read -r label target <<< "$entry"
   jump="-"   # all pg guests are on the LAN (no jump needed)
+  log "== $label: postgres dump =="
+  if $DRY_RUN; then
+    continue
+  fi
   container=$(ssh_run "$target" "$jump" "docker ps --format {{.Names}} 2>/dev/null | grep -iE 'postgres|pgsql|db' | head -1" 2>/dev/null || true)
   if [ -z "$container" ]; then
-    log "== $label: no postgres container, skipping dump =="
+    warn "no postgres container found, skipping dump"
     continue
   fi
   dest="$BACKUP_ROOT/postgres/$label"
   mkdir -p "$dest"
   out="$dest/all_$(date '+%Y%m%d-%H%M%S').sql"
-  log "== $label: pg_dumpall from $container =="
-  if ! $DRY_RUN; then
-    if ssh_run "$target" "$jump" "docker exec $container pg_dumpall -U postgres 2>/dev/null" > "$out" && [ -s "$out" ]; then
-      log "  OK: $out ($(du -h "$out" | cut -f1))"
-      ls -1t "$dest"/all_*.sql 2>/dev/null | tail -n +8 | xargs -r rm -f   # keep last 7
+  log "  pg_dumpall from $container"
+  if ssh_run "$target" "$jump" "docker exec $container pg_dumpall -U postgres 2>/dev/null" > "$out" && [ -s "$out" ]; then
+    log "  OK: $out ($(du -h "$out" | cut -f1))"
+    ls -1t "$dest"/all_*.sql 2>/dev/null | tail -n +8 | xargs -r rm -f   # keep last 7
+  else
+    # Fallback: dump the app-named database with the app-named user.
+    rm -f "$out"
+    if ssh_run "$target" "$jump" "docker exec $container pg_dump -U $label -d $label 2>/dev/null" > "$out" && [ -s "$out" ]; then
+      log "  OK (fallback user): $out ($(du -h "$out" | cut -f1))"
     else
-      # Fallback: dump the app-named database with the app-named user.
+      warn "pg_dumpall/pg_dump failed for $label (raw volume copy still covers this)"
       rm -f "$out"
-      if ssh_run "$target" "$jump" "docker exec $container pg_dump -U $label -d $label 2>/dev/null" > "$out" && [ -s "$out" ]; then
-        log "  OK (fallback user): $out ($(du -h "$out" | cut -f1))"
-      else
-        log "  WARN: pg_dumpall/pg_dump failed for $label (raw volume copy still covers this)"
-        rm -f "$out"
-      fi
     fi
   fi
 done
@@ -155,10 +160,19 @@ for entry in "${K3S_NODES[@]}"; do
   if ! $DRY_RUN; then
     if ! rsync -aHAX --no-owner --no-group --delete --rsync-path="sudo rsync" -e "ssh ${SSH_OPTS[*]}" \
         "$target:/var/lib/rancher/k3s/storage/" "$dest/" 2>>"$LOG_FILE"; then
-      log "  WARN: k3s rsync failed for $label"
+      warn "k3s rsync failed for $label"
     fi
   fi
 done
 
+if $DRY_RUN; then
+  log "Dry run complete (nothing written)"
+  exit 0
+fi
+
 SIZE="$(du -sh "$BACKUP_ROOT" 2>/dev/null | cut -f1)"
+if [ "$FAILURES" -gt 0 ]; then
+  log "App-data backup FINISHED WITH $FAILURES FAILURES ($SIZE on disk)"
+  exit 1
+fi
 log "App-data backup complete ($SIZE on disk)"
