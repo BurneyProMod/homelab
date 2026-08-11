@@ -201,6 +201,103 @@ else
   fail "Hardcoded secrets in compose.yaml (use env vars instead):$COMPOSE_REAL"
 fi
 
+# ── Extended audit checks (2026-08-11) ───────────────────────────────────────
+
+COMPOSE_FILES="docker/*/compose.yaml docker/*/docker-compose.yml"
+
+header "Unpinned images (compose.yaml + docker-compose.yml)"
+UNPINNED_ALL=$(grep -Hn 'image:.*:latest' $COMPOSE_FILES 2>/dev/null | grep -v 'TODO' || true)
+if [ -z "$UNPINNED_ALL" ]; then
+  ok "No unpinned :latest images (both compose filenames)"
+else
+  fail "Unpinned images found:$UNPINNED_ALL"
+fi
+
+header "TODO placeholder images"
+TODO_IMAGES=$(grep -Hn 'image:.*TODO' $COMPOSE_FILES 2>/dev/null || true)
+if [ -z "$TODO_IMAGES" ]; then
+  ok "No TODO placeholder images"
+else
+  fail "TODO placeholder images (resolve before deploy):$TODO_IMAGES"
+fi
+
+header "Kubernetes :latest images"
+K8S_LATEST=$(grep -Hn 'image:.*:latest' kubernetes/apps/*.yml 2>/dev/null || true)
+if [ -z "$K8S_LATEST" ]; then
+  ok "No :latest images in kubernetes/apps"
+else
+  fail ":latest images in kubernetes/apps (pin a tag):$K8S_LATEST"
+fi
+
+header "NodePort uniqueness (kubernetes/apps)"
+DUP_NODEPORTS=$(grep -hoE 'nodePort: [0-9]+' kubernetes/apps/*.yml 2>/dev/null | sort | uniq -d || true)
+if [ -z "$DUP_NODEPORTS" ]; then
+  ok "No duplicate NodePorts in kubernetes/apps"
+else
+  fail "Duplicate NodePorts detected:$DUP_NODEPORTS"
+fi
+
+header "Caddy vs manifest NodePort agreement"
+MANIFEST_NP=$(grep -hoE 'nodePort: [0-9]+' kubernetes/apps/*.yml 2>/dev/null | awk '{print $2}' | sort -n | tr '\n' ' ' || true)
+CADDY_NP=$(grep -hoE '(proxy_lan|reverse_proxy|forward_auth) 192\.168\.1\.7[012]:[0-9]+' config/caddy/Caddyfile 2>/dev/null | grep -oE '[0-9]+$' | sort -n | uniq | tr '\n' ' ' || true)
+if [ "$MANIFEST_NP" == "$CADDY_NP" ]; then
+  ok "Caddy and manifests agree on NodePorts"
+else
+  fail "NodePort mismatch: manifests [$MANIFEST_NP] vs Caddy [$CADDY_NP]"
+fi
+
+header "Referenced secrets coverage (create-secrets.sh)"
+REF_SECRETS=$(grep -rhoE 'name: [a-z0-9-]+-secret' kubernetes/ 2>/dev/null | awk '{print $2}' | sort -u)
+CREATED_SECRETS=$(grep -hoE 'secret generic [a-z0-9-]+' scripts/create-secrets.sh 2>/dev/null | awk '{print $3}' | sort -u)
+MISSING_SECRETS=""
+for s in $REF_SECRETS; do
+  if ! echo "$CREATED_SECRETS" | grep -qx "$s"; then
+    MISSING_SECRETS="$MISSING_SECRETS $s"
+  fi
+done
+if [ -z "$MISSING_SECRETS" ]; then
+  ok "All referenced secrets are created by create-secrets.sh"
+else
+  fail "Referenced secrets missing from create-secrets.sh:$MISSING_SECRETS"
+fi
+
+header "Compose bind-mount config sources exist"
+MISSING_MOUNTS=""
+for f in $COMPOSE_FILES; do
+  [ -f "$f" ] || continue
+  dir="$(dirname "$f")"
+  while read -r src; do
+    [ -z "$src" ] && continue
+    base="$(basename "$src")"
+    case "$base" in
+      Dockerfile|*.yml|*.yaml|*.json|*.conf|*.toml|*.ini|*.env|*.sh|*.py|*.crt|*.key|*.pem)
+        if [ ! -e "$dir/$src" ]; then
+          MISSING_MOUNTS="$MISSING_MOUNTS $f:$src"
+        fi
+        ;;
+    esac
+  done < <(grep -hoE '^\s*- \./[^:]+' "$f" 2>/dev/null | sed -E 's/^\s*- //' | sort -u)
+done
+if [ -z "$MISSING_MOUNTS" ]; then
+  ok "All relative config bind-mount sources exist in repo"
+else
+  fail "Bind-mount sources missing:$MISSING_MOUNTS"
+fi
+
+header "Makefile script references exist"
+MISSING_MK=""
+while read -r cmd; do
+  p="$(echo "$cmd" | awk '{print $2}')"
+  if [ ! -f "$p" ]; then
+    MISSING_MK="$MISSING_MK $p"
+  fi
+done < <(grep -E '^\s+bash scripts/' Makefile | sed -E 's/^\s+//')
+if [ -z "$MISSING_MK" ]; then
+  ok "Makefile script references exist"
+else
+  fail "Makefile references missing scripts:$MISSING_MK"
+fi
+
 # ── Summary ───────────────────────────────────────────────────────────────────
 
 echo ""
