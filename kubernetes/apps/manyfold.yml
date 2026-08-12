@@ -27,6 +27,18 @@ spec:
   storageClassName: ""
   volumeName: manyfold-data
 ---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: manyfold-config
+  namespace: default
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: local-path
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -47,16 +59,18 @@ spec:
       initContainers:
       - name: chmod-data
         image: busybox:1.36
-        command: ["sh", "-c", "chmod 0775 /config /models"]
+        command: ["sh", "-c", "chmod 0775 /config /models /usr/src/app/plugins"]
         securityContext:
           runAsUser: 0
         volumeMounts:
-        - name: data
+        - name: config
           mountPath: /config
-          subPath: config
         - name: data
           mountPath: /models
           subPath: models
+        - name: data
+          mountPath: /usr/src/app/plugins
+          subPath: plugins
       containers:
       - name: manyfold
         image: manyfold3d/manyfold:latest
@@ -79,12 +93,14 @@ spec:
         - name: DATABASE_NAME
           value: /config/manyfold.sqlite3
         volumeMounts:
-        - name: data
+        - name: config
           mountPath: /config
-          subPath: config
         - name: data
           mountPath: /models
           subPath: models
+        - name: data
+          mountPath: /usr/src/app/plugins
+          subPath: plugins
         resources:
           requests:
             cpu: 200m
@@ -93,6 +109,9 @@ spec:
             cpu: 1000m
             memory: 2048Mi
       volumes:
+      - name: config
+        persistentVolumeClaim:
+          claimName: manyfold-config
       - name: data
         persistentVolumeClaim:
           claimName: manyfold-data

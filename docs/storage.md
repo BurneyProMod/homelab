@@ -45,24 +45,23 @@ Workloads run on the 3-node Proxmox cluster backed by a single Synology NFS4 exp
 
 See `backup-layout.md`. Synology `homelab` share mounted on burndev at `/mnt/syn` and on PVE nodes at `/mnt/synology/homelab`.
 
+## Per-user service content on the homelab share (2026-08-12)
 
-## Per-user service data on the homelab share (2026-08-11)
+The Synology `homelab` share hosts only **content** for these services under
+`homes/npburney/<service>/` (exposed to guests as `homes/`). Application state
+(configs, databases) stays on the default storage: LXC rootfs / docker volumes
+for LXCs, `local-path` PVCs for k3s.
 
-Service data lives on the Synology `homelab` share under `homes/npburney/<service>/`
-(exposed to guests as `homes/`). This keeps application data directly on the NAS,
-protected by Synology snapshots, instead of inside LXC rootfs or k3s local-path.
-
-| Service | Host | Share path | Ownership (host-side) | Mount |
-|---------|------|------------|----------------------|-------|
-| stash | pve-exu LXC 123 | `homes/npburney/stash/{config,blobs,cache,generated,metadata}` | `100000:100000` (container root via LXC subuid) | LXC `mp1` -> `/srv/stash` |
-| paperless | pve-exu LXC 119 | `homes/npburney/paperless/{data,media,pgdata,redisdata,consume,export}` | `101000:101000` (web/uid1000), `100999:*` (postgres/redis uid999) | LXC `mp1` -> `/srv/paperless-data` |
-| manyfold | k3s (static NFS PV) | `homes/npburney/manyfold/{config,models}` | `1000:1000` (pod PUID/PGID) | NFS PV `manyfold-data` -> `/config`,`/models` |
+| Service | Host | Content on share | App state location | Mount |
+|---------|------|------------------|--------------------|-------|
+| stash | pve-exu LXC 123 | `homes/npburney/stash/` (media library) | `./config,./blobs,./cache,./generated,./metadata` in compose dir (LXC) | LXC `mp1` -> `/srv/stash`; `STASH_STASH=/srv/stash` |
+| paperless | pve-exu LXC 119 | `homes/npburney/paperless/` (media: `documents/`) | named volumes `data`,`pgdata`,`redisdata`; `./consume`,`./export` | LXC `mp1` -> `/srv/paperless-data` -> `/usr/src/paperless/media` |
+| manyfold | k3s | `homes/npburney/manyfold/models`, `plugins` | `manyfold-config` PVC (local-path, 1Gi) -> `/config` (sqlite) | NFS PV `manyfold-data` subPath `models` -> `/models`, `plugins` -> `/usr/src/app/plugins` |
 
 Notes:
 - NFS ownership is checked server-side with the client's mapped uid. LXC subuid base is 100000
   (container uid 0 -> host 100000; uid 1000 -> 101000; uid 999 -> 100999). k3s VMs have no
   idmapping, so pod uid 1000 == share uid 1000.
-- Postgres entrypoint runs as root and needs a writable data dir; the compose `db` service
-  pins `user: "999:999"` so the entrypoint skips the root-only chown/chmod steps.
-- The `homelab` share has Synology snapshot protection (`@sharesnap/homelab`), which now
-  covers these app-data directories directly.
+- The `homelab` share has Synology snapshot protection (`@sharesnap/homelab`), which covers
+  this content directory directly. App state on LXC rootfs / local-path is covered by
+  vzdump / the k8s backup job.

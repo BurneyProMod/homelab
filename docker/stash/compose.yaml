@@ -5,17 +5,17 @@ services:
     ports:
       - 9999:9999
     environment:
-      - STASH_STASH=/srv/burntv/media
+      - STASH_STASH=/srv/stash
       - STASH_GENERATED=/generated/
       - STASH_METADATA=/metadata/
       - STASH_CACHE=/cache/
       - STASH_PORT=9999
       - TZ=America/Chicago
     volumes:
+      - ./config:/root/.stash
+      - ./metadata:/metadata
+      - ./cache:/cache
+      - ./blobs:/blobs
+      - ./generated:/generated
       - /srv/stash:/srv/stash
-      - /srv/stash/config:/root/.stash
       - /srv/burntv/media:/srv/burntv/media
-      - /srv/stash/metadata:/metadata
-      - /srv/stash/cache:/cache
-      - /srv/stash/blobs:/blobs
-      - /srv/stash/generated:/generated
