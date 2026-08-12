@@ -44,3 +44,25 @@ Workloads run on the 3-node Proxmox cluster backed by a single Synology NFS4 exp
 ## Backup storage layout
 
 See `backup-layout.md`. Synology `homelab` share mounted on burndev at `/mnt/syn` and on PVE nodes at `/mnt/synology/homelab`.
+
+
+## Per-user service data on the homelab share (2026-08-11)
+
+Service data lives on the Synology `homelab` share under `homes/npburney/<service>/`
+(exposed to guests as `homes/`). This keeps application data directly on the NAS,
+protected by Synology snapshots, instead of inside LXC rootfs or k3s local-path.
+
+| Service | Host | Share path | Ownership (host-side) | Mount |
+|---------|------|------------|----------------------|-------|
+| stash | pve-exu LXC 123 | `homes/npburney/stash/{config,blobs,cache,generated,metadata}` | `100000:100000` (container root via LXC subuid) | LXC `mp1` -> `/srv/stash-data` |
+| paperless | pve-exu LXC 119 | `homes/npburney/paperless/{data,media,pgdata,redisdata,consume,export}` | `101000:101000` (web/uid1000), `100999:*` (postgres/redis uid999) | LXC `mp1` -> `/srv/paperless-data` |
+| manyfold | k3s (static NFS PV) | `homes/npburney/manyfold/{config,models}` | `1000:1000` (pod PUID/PGID) | NFS PV `manyfold-data` -> `/config`,`/models` |
+
+Notes:
+- NFS ownership is checked server-side with the client's mapped uid. LXC subuid base is 100000
+  (container uid 0 -> host 100000; uid 1000 -> 101000; uid 999 -> 100999). k3s VMs have no
+  idmapping, so pod uid 1000 == share uid 1000.
+- Postgres entrypoint runs as root and needs a writable data dir; the compose `db` service
+  pins `user: "999:999"` so the entrypoint skips the root-only chown/chmod steps.
+- The `homelab` share has Synology snapshot protection (`@sharesnap/homelab`), which now
+  covers these app-data directories directly.

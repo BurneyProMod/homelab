@@ -1,0 +1,35 @@
+services:
+  broker:
+    image: docker.io/valkey/valkey:9-alpine
+    restart: unless-stopped
+    volumes:
+      - /srv/paperless-data/redisdata:/data
+
+  db:
+    user: "999:999"
+    image: docker.io/library/postgres:18
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: paperless
+      POSTGRES_USER: paperless
+      POSTGRES_PASSWORD: paperless
+    volumes:
+      - /srv/paperless-data/pgdata:/var/lib/postgresql
+
+  webserver:
+    image: ghcr.io/paperless-ngx/paperless-ngx:latest
+    restart: unless-stopped
+    depends_on:
+      - db
+      - broker
+    ports:
+      - 8000:8000
+    env_file: .env
+    environment:
+      USERMAP_UID: 1000
+      USERMAP_GID: 1000
+    volumes:
+      - /srv/paperless-data/data:/usr/src/paperless/data
+      - /srv/paperless-data/media:/usr/src/paperless/media
+      - /srv/paperless-data/export:/usr/src/paperless/export
+      - /srv/paperless-data/consume:/usr/src/paperless/consume

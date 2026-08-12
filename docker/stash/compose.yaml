@@ -1,0 +1,20 @@
+services:
+  stash:
+    image: stashapp/stash:latest
+    restart: unless-stopped
+    ports:
+      - 9999:9999
+    environment:
+      - STASH_STASH=/srv/burntv/media
+      - STASH_GENERATED=/generated/
+      - STASH_METADATA=/metadata/
+      - STASH_CACHE=/cache/
+      - STASH_PORT=9999
+      - TZ=America/Chicago
+    volumes:
+      - /srv/stash-data/config:/root/.stash
+      - /srv/burntv/media:/srv/burntv/media
+      - /srv/stash-data/metadata:/metadata
+      - /srv/stash-data/cache:/cache
+      - /srv/stash-data/blobs:/blobs
+      - /srv/stash-data/generated:/generated

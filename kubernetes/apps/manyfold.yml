@@ -1,4 +1,20 @@
 apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: manyfold-data
+spec:
+  capacity:
+    storage: 10Gi
+  accessModes: [ReadWriteOnce]
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: ""
+  mountOptions:
+    - vers=4.1
+  nfs:
+    server: 192.168.1.11
+    path: /volume1/homelab/homes/npburney/manyfold
+---
+apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: manyfold-data
@@ -8,7 +24,8 @@ spec:
   resources:
     requests:
       storage: 10Gi
-  storageClassName: local-path
+  storageClassName: ""
+  volumeName: manyfold-data
 ---
 apiVersion: apps/v1
 kind: Deployment
