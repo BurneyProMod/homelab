@@ -54,7 +54,7 @@ protected by Synology snapshots, instead of inside LXC rootfs or k3s local-path.
 
 | Service | Host | Share path | Ownership (host-side) | Mount |
 |---------|------|------------|----------------------|-------|
-| stash | pve-exu LXC 123 | `homes/npburney/stash/{config,blobs,cache,generated,metadata}` | `100000:100000` (container root via LXC subuid) | LXC `mp1` -> `/srv/stash-data` |
+| stash | pve-exu LXC 123 | `homes/npburney/stash/{config,blobs,cache,generated,metadata}` | `100000:100000` (container root via LXC subuid) | LXC `mp1` -> `/srv/stash` |
 | paperless | pve-exu LXC 119 | `homes/npburney/paperless/{data,media,pgdata,redisdata,consume,export}` | `101000:101000` (web/uid1000), `100999:*` (postgres/redis uid999) | LXC `mp1` -> `/srv/paperless-data` |
 | manyfold | k3s (static NFS PV) | `homes/npburney/manyfold/{config,models}` | `1000:1000` (pod PUID/PGID) | NFS PV `manyfold-data` -> `/config`,`/models` |
 

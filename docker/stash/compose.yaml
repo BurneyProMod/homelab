@@ -12,9 +12,10 @@ services:
       - STASH_PORT=9999
       - TZ=America/Chicago
     volumes:
-      - /srv/stash-data/config:/root/.stash
+      - /srv/stash:/srv/stash
+      - /srv/stash/config:/root/.stash
       - /srv/burntv/media:/srv/burntv/media
-      - /srv/stash-data/metadata:/metadata
-      - /srv/stash-data/cache:/cache
-      - /srv/stash-data/blobs:/blobs
-      - /srv/stash-data/generated:/generated
+      - /srv/stash/metadata:/metadata
+      - /srv/stash/cache:/cache
+      - /srv/stash/blobs:/blobs
+      - /srv/stash/generated:/generated
