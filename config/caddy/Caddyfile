@@ -177,6 +177,11 @@ files.burney.network {
 	import proxy_lan 192.168.1.64:8085
 }
 
+grafana.burney.network {
+	import tls_le_dns
+	import proxy_lan 192.168.1.168:3000
+}
+
 code.burney.network {
 	import tls_le_dns
 	@allowed remote_ip 192.168.1.0/24 10.8.0.0/24 127.0.0.1/8

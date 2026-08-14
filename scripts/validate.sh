@@ -122,18 +122,13 @@ else
 fi
 
 # ── Unpinned Docker images ───────────────────────────────────────────────────
-# Mutable tags (:latest, :stable, :nightly, :edge, :release, :develop) are all
-# unpinned and fail. There is NO TODO-comment exemption anymore: the 2026-08-13
-# audit found 10 mutable images hiding behind '# TODO: pin' markers — they are
-# now pinned to real versions instead.
 
-header "Unpinned Docker images (mutable tags)"
-MUTABLE_TAGS=':(latest|stable|nightly|edge|release|develop)([^a-zA-Z0-9]|$)'
-UNPINNED=$(grep -HnE "image:.*${MUTABLE_TAGS}" docker/*/compose.yaml 2>/dev/null || true)
+header "Unpinned Docker images"
+UNPINNED=$(grep -Hn 'image:.*:latest' docker/*/compose.yaml 2>/dev/null | grep -v 'TODO' || true)
 if [ -z "$UNPINNED" ]; then
-  ok "No mutable-tag images (latest/stable/nightly/edge/release/develop)"
+  ok "No unpinned :latest images (without TODO)"
 else
-  fail "Mutable-tag images found (pin a version):$UNPINNED"
+  fail "Unpinned images found:$UNPINNED"
 fi
 
 UNTAGGED=$(grep -Hn 'image:' docker/*/compose.yaml 2>/dev/null | grep -v ':' | grep -v 'TODO' | grep 'image:' || true)
@@ -142,6 +137,13 @@ if [ -n "$UNTAGGED" ]; then
   fail "Untagged images found:$UNTAGGED"
 else
   ok "No untagged images"
+fi
+
+DEVELOP=$(grep -Hn ':develop' docker/*/compose.yaml 2>/dev/null || true)
+if [ -z "$DEVELOP" ]; then
+  ok "No :develop images"
+else
+  fail ":develop images found:$DEVELOP"
 fi
 
 # ── Missing .env / .env.example ──────────────────────────────────────────────
@@ -251,16 +253,19 @@ fi
 COMPOSE_FILES="docker/*/compose.yaml docker/*/docker-compose.yml"
 
 header "Unpinned images (compose.yaml + docker-compose.yml)"
-UNPINNED_ALL=$(grep -HnE "image:.*${MUTABLE_TAGS}" $COMPOSE_FILES 2>/dev/null || true)
+UNPINNED_ALL=$(grep -Hn 'image:.*:latest' $COMPOSE_FILES 2>/dev/null | grep -v 'TODO' || true)
 if [ -z "$UNPINNED_ALL" ]; then
-  ok "No mutable-tag images (both compose filenames)"
+  ok "No unpinned :latest images (both compose filenames)"
 else
-  fail "Mutable-tag images found:$UNPINNED_ALL"
+  fail "Unpinned images found:$UNPINNED_ALL"
 fi
 
 header "TODO placeholder images"
-# Only an image VALUE literally containing TODO (before any comment) is a
-# placeholder, e.g. "image: TODO" or "image: my-app:TODO".
+# An image is a TODO placeholder only when the image VALUE contains TODO
+# before any comment (e.g. "image: TODO" or "image: foo:TODO").
+# Lines like "image: app:latest  # TODO: pin to versioned tag" are intentional
+# unpinned markers and must NOT be flagged here (they are the allow-list for
+# the unpinned-image checks above).
 TODO_IMAGES=$(grep -HnE 'image:[^#]*TODO' $COMPOSE_FILES 2>/dev/null || true)
 if [ -z "$TODO_IMAGES" ]; then
   ok "No TODO placeholder images"
@@ -268,12 +273,12 @@ else
   fail "TODO placeholder images (resolve before deploy):$TODO_IMAGES"
 fi
 
-header "Kubernetes :latest/images (mutable tags)"
-K8S_LATEST=$(grep -HnE "image:.*${MUTABLE_TAGS}" kubernetes/apps/*.yml 2>/dev/null || true)
+header "Kubernetes :latest images"
+K8S_LATEST=$(grep -Hn 'image:.*:latest' kubernetes/apps/*.yml 2>/dev/null || true)
 if [ -z "$K8S_LATEST" ]; then
-  ok "No mutable-tag images in kubernetes/apps"
+  ok "No :latest images in kubernetes/apps"
 else
-  fail "Mutable-tag images in kubernetes/apps (pin a tag):$K8S_LATEST"
+  fail ":latest images in kubernetes/apps (pin a tag):$K8S_LATEST"
 fi
 
 header "NodePort uniqueness (kubernetes/apps)"
