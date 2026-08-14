@@ -1,0 +1,94 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Homelab host inventory — single source of truth for the rebuild flow AND the
+# app-data backup/restore manifest.
+#
+# After a disaster: pull the repo, fill out this file, then run:
+#   bash scripts/bootstrap.sh --stage 0        # preflight
+#   bash scripts/bootstrap.sh --stage 1-8      # rebuild
+#
+# backup fields (used by backup-app-data.sh / restore-app-data.sh):
+#   blabel:  backup label (defaults to name; distinct for the two caddy LXCs)
+#   btype:   docker = compose project dirs + named volumes | native = data dirs
+#   bjump:   SSH ProxyJump for guests not directly reachable (media VLAN)
+#   sources: space-separated live data dirs on the guest
+#
+# Verified against the live cluster 2026-08-13 (pct/qm across all 3 nodes).
+# Guests with enabled: false exist in Proxmox but are stopped/decommissioned.
+# ─────────────────────────────────────────────────────────────────────────────
+
+network:
+  gateway: 192.168.1.1
+  dns: 192.168.1.1
+  caddy_vip: 192.168.1.10        # keepalived VIP for *.burney.network
+  media_subnet: 10.30.0.0/24     # behind caddy LXC 101 proxy jump
+
+nas:
+  host: synology
+  ip: 192.168.1.11
+  share: /volume1/homelab
+  mount_paths:
+    pve: /mnt/synology/homelab
+    burndev: /mnt/syn
+  backup_root: backups/homelab
+
+proxmox_nodes:
+  - { name: pve-core, ip: 192.168.1.30, ssh_user: npburney }
+  - { name: pve-gpu,  ip: 192.168.1.32, ssh_user: npburney }
+  - { name: pve-exu,  ip: 192.168.1.31, ssh_user: npburney }
+
+# ── LXC / VM guests ──────────────────────────────────────────────────────────
+# stack: docker compose dir(s) under docker/ deployed by bootstrap stage 5
+# type:  lxc | vm (k3s nodes are VMs)
+guests:
+  - { vmid: 100, node: pve-gpu, name: jellyfin,   ip: 192.168.1.187, type: lxc, enabled: true,  role: media, stack: "",     blabel: jellyfin, btype: native, bjump: "-", sources: "/var/lib/jellyfin" }
+  - { vmid: 101, node: pve-gpu, name: caddy,      ip: 192.168.1.40,  type: lxc, enabled: true,  role: edge,  stack: caddy,  blabel: caddy-gpu, btype: native, bjump: "-", sources: "/etc/caddy /var/lib/caddy" }
+  - { vmid: 102, node: pve-core, name: pi-agent,  ip: "dhcp",        type: lxc, enabled: true,  role: agent, stack: "",     blabel: "", btype: "", bjump: "-", sources: "" }
+  - { vmid: 103, node: pve-core, name: caddy,     ip: 192.168.1.42,  type: lxc, enabled: true,  role: edge,  stack: caddy,  blabel: caddy-core, btype: native, bjump: "-", sources: "/etc/caddy /var/lib/caddy" }
+  - { vmid: 110, node: pve-core, name: identity,  ip: 192.168.1.60,  type: lxc, enabled: true,  role: auth,  stack: lldap,  blabel: identity, btype: docker, bjump: "-", sources: "/home/npburney/docker/lldap /home/npburney/docker/openbao" }
+  - { vmid: 111, node: pve-exu,  name: immich,    ip: 192.168.1.61,  type: lxc, enabled: true,  role: apps,  stack: immich, blabel: immich, btype: docker, bjump: "-", sources: "/home/npburney/immich" }
+  - { vmid: 112, node: pve-exu,  name: docker-apps, ip: 192.168.1.62, type: lxc, enabled: true, role: apps, stack: "vikunja rackpeek actual-budget tasks-md", blabel: apps, btype: docker, bjump: "-", sources: "/home/npburney/docker/vikunja /home/npburney/docker/rackpeek /home/npburney/docker/actual-budget /home/npburney/docker/tasks-md" }
+  - { vmid: 113, node: pve-exu,  name: archives,  ip: 192.168.1.63,  type: lxc, enabled: true,  role: apps,  stack: karakeep, blabel: archives, btype: docker, bjump: "-", sources: "/home/npburney/docker/karakeep" }
+  - { vmid: 114, node: pve-core, name: files,     ip: 192.168.1.64,  type: lxc, enabled: true,  role: apps,  stack: filebrowser-quantum, blabel: files, btype: docker, bjump: "-", sources: "/opt/filebrowser" }
+  - { vmid: 115, node: pve-core, name: operations, ip: 192.168.1.65, type: lxc, enabled: true, role: ops, stack: scanopy, blabel: operations, btype: docker, bjump: "-", sources: "/home/npburney/docker/scanopy" }
+  - { vmid: 116, node: pve-exu,  name: caddy,     ip: 192.168.1.41,  type: lxc, enabled: false, role: edge,   stack: "",     blabel: "", btype: "", bjump: "-", sources: "" }
+  - { vmid: 117, node: pve-exu,  name: stepca,    ip: 192.168.1.43,  type: lxc, enabled: false, role: retired, stack: "",   blabel: "", btype: "", bjump: "-", sources: "" }
+  - { vmid: 118, node: pve-core, name: authentik, ip: 192.168.1.66,  type: lxc, enabled: true,  role: auth,  stack: authentik, blabel: authentik, btype: docker, bjump: "-", sources: "/opt/authentik" }
+  - { vmid: 119, node: pve-exu,  name: paperless, ip: 192.168.1.67,  type: lxc, enabled: true,  role: apps,  stack: paperless, blabel: paperless, btype: docker, bjump: "-", sources: "/home/npburney/docker/paperless" }
+  - { vmid: 120, node: pve-core, name: k3s-core,  ip: 192.168.1.70,  type: vm,  enabled: true,  role: k3s,   stack: "",     blabel: "", btype: "", bjump: "-", sources: "" }
+  - { vmid: 121, node: pve-exu,  name: k3s-exu,   ip: 192.168.1.71,  type: vm,  enabled: true,  role: k3s,   stack: "",     blabel: "", btype: "", bjump: "-", sources: "" }
+  - { vmid: 122, node: pve-gpu,  name: k3s-gpu,   ip: 192.168.1.72,  type: vm,  enabled: true,  role: k3s,   stack: "",     blabel: "", btype: "", bjump: "-", sources: "" }
+  - { vmid: 123, node: pve-exu,  name: stash,     ip: 192.168.1.68,  type: lxc, enabled: true,  role: apps,  stack: stash,  blabel: stash, btype: docker, bjump: "-", sources: "/home/npburney/docker/stash" }
+  - { vmid: 124, node: pve-exu,  name: scrutiny,  ip: 192.168.1.69,  type: lxc, enabled: true,  role: apps,  stack: scrutiny-hub, blabel: scrutiny, btype: docker, bjump: "-", sources: "/home/npburney/docker/scrutiny" }
+  - { vmid: 201, node: pve-gpu,  name: sonarr,    ip: 10.30.0.11,    type: lxc, enabled: true,  role: media, stack: "",     blabel: sonarr, btype: native, bjump: "root@192.168.1.40", sources: "/var/lib/sonarr" }
+  - { vmid: 202, node: pve-gpu,  name: radarr,    ip: 10.30.0.12,    type: lxc, enabled: true,  role: media, stack: "",     blabel: radarr, btype: native, bjump: "root@192.168.1.40", sources: "/var/lib/radarr" }
+  - { vmid: 203, node: pve-gpu,  name: lidarr,    ip: 10.30.0.13,    type: lxc, enabled: true,  role: media, stack: "",     blabel: lidarr, btype: native, bjump: "root@192.168.1.40", sources: "/var/lib/lidarr" }
+  - { vmid: 204, node: pve-gpu,  name: prowlarr,  ip: 10.30.0.14,    type: lxc, enabled: true,  role: media, stack: "",     blabel: prowlarr, btype: native, bjump: "root@192.168.1.40", sources: "/var/lib/prowlarr" }
+  - { vmid: 205, node: pve-gpu,  name: qbit,      ip: 10.30.0.15,    type: lxc, enabled: true,  role: media, stack: "",     blabel: qbit, btype: docker, bjump: "root@192.168.1.40", sources: "/opt/qbit-vpn" }
+
+# ── Postgres-dump targets (backup-app-data.sh stage: pg_dumpall) ─────────────
+pg_targets:
+  - { blabel: immich,   ip: 192.168.1.61 }
+  - { blabel: paperless, ip: 192.168.1.67 }
+  - { blabel: authentik, ip: 192.168.1.66 }
+  - { blabel: operations, ip: 192.168.1.65 }   # scanopy
+
+# ── Standalone hosts (not Proxmox guests) ────────────────────────────────────
+standalone:
+  - { name: burndev,       ip: 192.168.1.50,  role: llm+media, ssh_user: npburney, stacks: "ollama scrutiny-collector" }
+  - { name: kwsdisplay,    ip: 192.168.1.168, role: monitoring, ssh_user: npburney, stacks: "" }
+  - { name: kws-rpi-1,     ip: "",            role: unifi,      ssh_user: "",        stacks: "" }
+  - { name: homeassistant, ip: "",            role: ha,         ssh_user: "",        stacks: "" }
+
+# ── k3s ──────────────────────────────────────────────────────────────────────
+k3s:
+  server: k3s-exu                  # initial control-plane
+  nodes: [k3s-core, k3s-exu, k3s-gpu]
+  kubeconfig: /etc/rancher/k3s/k3s.yaml   # on the node; extracted to pve-core
+  storage_class: local-path
+
+# ── Backup/restore runner ────────────────────────────────────────────────────
+backup:
+  runner: operations              # LXC 115 (192.168.1.65), runs the app-data backup
+  ssh_key: ~/.ssh/id_ed25519_backup
+  runner_uid: 100000              # unprivileged LXC root on the NAS NFS mount
+  schedule: "0 4 * * *"           # ops LXC crontab

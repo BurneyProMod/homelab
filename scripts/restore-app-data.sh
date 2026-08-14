@@ -12,6 +12,7 @@ set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "$REPO_DIR/scripts/lib-paths.sh"
+source "$REPO_DIR/scripts/lib-config.sh"
 LOG_FILE="/var/log/restore-app-data.log"
 DRY_RUN=true
 ONLY=""
@@ -55,33 +56,24 @@ fi
 # /etc/caddy -> etc_caddy ; /var/lib/caddy -> var_lib_caddy
 dir_slug() { echo "$1" | sed -e 's#^/##' -e 's#/#_#g'; }
 
-# Same manifest as backup-app-data.sh (keep in sync).
-GUESTS=(
-  "caddy-core|root@192.168.1.42|-|native|/etc/caddy /var/lib/caddy"
-  "identity|root@192.168.1.60|-|docker|/home/npburney/docker/lldap /home/npburney/docker/openbao"
-  "files|root@192.168.1.64|-|docker|/opt/filebrowser"
-  "authentik|root@192.168.1.66|-|docker|/opt/authentik"
-  "immich|root@192.168.1.61|-|docker|/home/npburney/immich"
-  "apps|root@192.168.1.62|-|docker|/home/npburney/docker/vikunja /home/npburney/docker/rackpeek /home/npburney/docker/actual-budget /home/npburney/docker/tasks-md"
-  "archives|root@192.168.1.63|-|docker|/home/npburney/docker/karakeep"
-  "paperless|root@192.168.1.67|-|docker|/home/npburney/docker/paperless"
-  "stash|root@192.168.1.68|-|docker|/home/npburney/docker/stash"
-  "scrutiny|root@192.168.1.69|-|docker|/home/npburney/docker/scrutiny"
-  "operations|root@192.168.1.65|-|docker|/home/npburney/docker/scanopy"
-  "jellyfin|root@192.168.1.187|-|native|/var/lib/jellyfin"
-  "caddy-gpu|root@192.168.1.40|-|native|/etc/caddy /var/lib/caddy"
-  "sonarr|root@10.30.0.11|root@192.168.1.40|native|/var/lib/sonarr"
-  "radarr|root@10.30.0.12|root@192.168.1.40|native|/var/lib/radarr"
-  "lidarr|root@10.30.0.13|root@192.168.1.40|native|/var/lib/lidarr"
-  "prowlarr|root@10.30.0.14|root@192.168.1.40|native|/var/lib/prowlarr"
-  "qbit|root@10.30.0.15|root@192.168.1.40|docker|/opt/qbit-vpn"
-)
+# Manifest: label|target|jump|type|source-dirs(space sep) — from config/hosts.yaml.
+GUESTS=()
+while read -r blabel ip btype bjump sources; do
+  [ -n "$blabel" ] || continue
+  [ -n "$ip" ] || continue
+  GUESTS+=("$blabel|root@$ip|$bjump|$btype|$sources")
+done < <(cfg_guests_backup)
 
-K3S_NODES=(
-  "k3s-core|npburney@192.168.1.70"
-  "k3s-exu|npburney@192.168.1.71"
-  "k3s-gpu|npburney@192.168.1.72"
-)
+# k3s nodes come from hosts.yaml guests with role=k3s.
+K3S_NODES=()
+while read -r g; do
+  [ -n "$g" ] || continue
+  local_role="$(echo "$g" | awk '{print $6}')"
+  local_name="$(echo "$g" | awk '{print $3}')"
+  local_ip="$(echo "$g" | awk '{print $4}')"
+  [ "$local_role" = "k3s" ] || continue
+  K3S_NODES+=("$local_name|npburney@$local_ip")
+done < <(cfg_guests)
 
 ssh_run() {
   local target="$1" jump="$2"; shift 2

@@ -1,10 +1,23 @@
-.PHONY: validate deploy-k8s deploy-docker backup backup-app restore-dry-run restore up
+.PHONY: validate deploy-k8s deploy-docker backup backup-app restore-dry-run restore up bootstrap bootstrap-stage bootstrap-apply
 
 validate:
 	bash scripts/validate.sh
 
 up:
 	bash scripts/up.sh
+
+# Disaster-recovery rebuild (see config/hosts.yaml + scripts/bootstrap.sh).
+#   make bootstrap              # full preview (all stages, dry-run)
+#   make bootstrap-stage N=3    # single stage preview
+#   make bootstrap-apply N=1    # apply a single stage (stage must support --apply)
+bootstrap:
+	bash scripts/bootstrap.sh
+
+bootstrap-stage:
+	bash scripts/bootstrap.sh --stage $(N)
+
+bootstrap-apply:
+	bash scripts/bootstrap.sh --stage $(N) --apply
 
 deploy-k8s:
 	bash scripts/deploy-k8s.sh
