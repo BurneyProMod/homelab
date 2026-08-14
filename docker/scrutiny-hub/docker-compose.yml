@@ -1,0 +1,35 @@
+# Scrutiny hub (web + influxdb) on pve-exu LXC 124 (192.168.1.69).
+# Live location: /home/npburney/docker/scrutiny/ on LXC 124.
+# Port 8086 exposed for Grafana (kwsdisplay) to read SMART history via a read-only token.
+services:
+  influxdb:
+    restart: unless-stopped
+    image: influxdb:2.8
+    ports:
+      - "8086:8086"
+    volumes:
+      - ./influxdb:/var/lib/influxdb2
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8086/health"]
+      interval: 5s
+      timeout: 10s
+      retries: 20
+
+  web:
+    restart: unless-stopped
+    image: ghcr.io/analogj/scrutiny:nightly-web
+    ports:
+      - 8080:8080
+    volumes:
+      - ./config:/opt/scrutiny/config
+    environment:
+      SCRUTINY_WEB_INFLUXDB_HOST: influxdb
+    depends_on:
+      influxdb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/health"]
+      interval: 5s
+      timeout: 10s
+      retries: 20
+      start_period: 10s

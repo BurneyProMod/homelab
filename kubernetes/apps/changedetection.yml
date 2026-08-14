@@ -27,7 +27,7 @@ spec:
     spec:
       containers:
       - name: changedetection
-        image: ghcr.io/dgtlmoon/changedetection.io:latest
+        image: ghcr.io/dgtlmoon/changedetection.io:0.55.8
         ports:
         - containerPort: 5000
         env:
@@ -71,7 +71,7 @@ spec:
     spec:
       containers:
       - name: browser
-        image: dgtlmoon/sockpuppetbrowser:latest
+        image: dgtlmoon/sockpuppetbrowser:0.0.3
         securityContext:
           capabilities:
             add: ["SYS_ADMIN"]

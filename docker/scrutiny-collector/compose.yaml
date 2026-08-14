@@ -1,6 +1,6 @@
 services:
   collector:
-    image: ghcr.io/analogj/scrutiny:latest-collector
+    image: ghcr.io/analogj/scrutiny:latest-collector  # TODO: pin to versioned tag when available
     container_name: scrutiny-collector
     restart: unless-stopped
     cap_add:

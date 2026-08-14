@@ -2,9 +2,11 @@
 # Deployed via Container Manager; stack lives at /volume1/docker/scrutiny-collector/ on the NAS.
 # Devices: Synology exposes data disks as /dev/sata1-4 (mapped to /dev/sda-d for smartctl scan)
 # plus /dev/nvme0 (needs SYS_ADMIN in addition to SYS_RAWIO).
+# SMART data is read with --device sat (see config/collector.yaml): the Synology controller
+# exposes the SATA disks as SCSI devices and plain SCSI reads return no ATA attributes.
 services:
   collector:
-    image: ghcr.io/analogj/scrutiny:latest-collector
+    image: ghcr.io/analogj/scrutiny:latest-collector  # TODO: pin to versioned tag when available
     container_name: scrutiny-collector
     restart: unless-stopped
     cap_add:
@@ -18,6 +20,7 @@ services:
       - /dev/nvme0
     volumes:
       - /run/udev:/run/udev:ro
+      - ./config:/opt/scrutiny/config
     environment:
       COLLECTOR_API_ENDPOINT: http://192.168.1.69:8080
       COLLECTOR_HOST_ID: synology

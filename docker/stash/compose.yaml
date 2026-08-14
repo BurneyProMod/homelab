@@ -1,6 +1,6 @@
 services:
   stash:
-    image: stashapp/stash:latest
+    image: stashapp/stash:latest  # TODO: pin to versioned tag or sha256 digest when available
     restart: unless-stopped
     ports:
       - 9999:9999
