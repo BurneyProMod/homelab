@@ -1,0 +1,6 @@
+FROM richardyoung/qwen3-14b-abliterated:Q4_K_M
+PARAMETER stop <|im_end|>
+PARAMETER stop <|im_start|>
+PARAMETER temperature 0.7
+PARAMETER top_p 0.9
+PARAMETER num_ctx 65536

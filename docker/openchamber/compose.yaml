@@ -1,0 +1,30 @@
+# OpenChamber web UI for OpenCode agents.
+# Live on pve-exu LXC 125 (192.168.1.73). Port 3000.
+# Data dirs mirror the opencode CLI layout so sessions/settings transfer 1:1.
+services:
+  openchamber:
+    build: .
+    container_name: openchamber
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    env_file: .env
+    environment:
+      TZ: America/Chicago
+    volumes:
+      # OpenChamber app config
+      - ./data/openchamber:/home/openchamber/.config/openchamber
+      # OpenCode runtime data (sessions db, auth, mcp-auth)
+      - ./data/opencode/share:/home/openchamber/.local/share/opencode
+      # OpenCode state (model, kv, prompt history)
+      - ./data/opencode/state:/home/openchamber/.local/state/opencode
+      # OpenCode config (opencode.json, agents, skills, commands, inventory)
+      - ./data/opencode/config:/home/openchamber/.config/opencode
+      # MCP secret files referenced as {file:...} in opencode.json
+      - ./data/secrets:/home/openchamber/.secrets
+      # SSH keys + config for git/remote ops
+      - ./data/ssh:/home/openchamber/.ssh
+      # Project workspaces (session directories resolve here)
+      - ./workspaces:/home/openchamber/workspaces

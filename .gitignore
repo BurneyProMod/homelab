@@ -46,7 +46,13 @@ secrets/homelab.env
 # llmeter build deps
 !/docker/llmeter/Dockerfile
 !/docker/llmeter/app.py
+!/docker/openchamber/Dockerfile
+!/docker/openchamber/entrypoint.sh
 # caddy edge config (HA pair; matches config/caddy/Caddyfile)
 !/docker/caddy/Caddyfile
 # filebrowser config (redacted; real config on LXC 114)
 !/docker/filebrowser-quantum/config.yaml
+
+# ollama per-model Modelfiles (num_ctx 65536, applied on burndev 2026-08-14)
+!/docker/ollama/modelfiles/
+!/docker/ollama/modelfiles/Modelfile.*

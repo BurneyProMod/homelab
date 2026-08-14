@@ -172,6 +172,37 @@ scrutiny.burney.network {
 	}
 }
 
+openchamber.burney.network {
+	import tls_le_dns
+	@allowed remote_ip 192.168.1.0/24 10.8.0.0/24 127.0.0.1/8
+	handle @allowed {
+		# WebSockets are automatic in Caddy; flush_interval -1 streams SSE immediately.
+		# Long timeouts for live streams and terminal sessions (project REVERSE_PROXY.md).
+		route {
+			reverse_proxy /outpost.goauthentik.io/* http://192.168.1.66:9000
+			forward_auth http://192.168.1.66:9000 {
+				uri /outpost.goauthentik.io/auth/caddy
+				copy_headers X-Authentik-Username X-Authentik-Groups X-Authentik-Email X-Authentik-Name X-Authentik-Uid X-Authentik-Meta-Outpost X-Authentik-Meta-Provider X-Authentik-Meta-App X-Authentik-Meta-Version
+				trusted_proxies private_ranges
+			}
+			reverse_proxy 192.168.1.73:3000 {
+				flush_interval -1
+				header_up Host {host}
+				header_up X-Real-IP {remote_host}
+				header_up X-Forwarded-For {remote_host}
+				header_up X-Forwarded-Proto {scheme}
+				transport http {
+					read_timeout 3600s
+					write_timeout 3600s
+				}
+			}
+		}
+	}
+	handle {
+		respond 403
+	}
+}
+
 files.burney.network {
 	import tls_le_dns
 	import proxy_lan 192.168.1.64:8085
