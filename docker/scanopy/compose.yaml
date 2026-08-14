@@ -2,7 +2,7 @@ name: scanopy
 
 services:
   daemon:
-    image: ghcr.io/scanopy/scanopy/daemon:latest  # TODO: pin to versioned tag or sha256 digest when available
+    image: ghcr.io/scanopy/scanopy/daemon:v0.17.9
     container_name: scanopy-daemon
     network_mode: host
     cap_add:
@@ -40,7 +40,7 @@ services:
       - scanopy
 
   server:
-    image: ghcr.io/scanopy/scanopy/server:latest  # TODO: pin to versioned tag or sha256 digest when available
+    image: ghcr.io/scanopy/scanopy/server:v0.17.9
     labels:
       - homepage.group=Infrastructure
       - homepage.name=Scanopy

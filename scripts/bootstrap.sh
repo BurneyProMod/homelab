@@ -107,8 +107,9 @@ stage_preflight() {
 
 stage_infra() {
   log "== stage 1: infra (Proxmox guests) =="
-  # Determine the PVE host to run pct/qm on: match guest's node to a node we
-  # can reach. Proxmox guests are created on their configured node.
+  # Guests are created on their configured node, with the tool matching the
+  # guest type: lxc -> pct create, vm -> qm create (k3s guests 120-122 are VMs;
+  # creating them via pct was wrong and produced undersized LXCs).
   local g
   while read -r g; do
     [ -n "$g" ] || continue
@@ -116,35 +117,54 @@ stage_infra() {
     vmid="$(echo "$g" | awk '{print $1}')"; node="$(echo "$g" | awk '{print $2}')"
     name="$(echo "$g" | awk '{print $3}')"; ip="$(echo "$g" | awk '{print $4}')"
     type="$(echo "$g" | awk '{print $5}')"
+    local tool="pct"
+    [ "$type" = "vm" ] && tool="qm"
     # Find the node's IP
     local node_ip=""
     while read -r n; do
       [ "$(echo "$n" | awk '{print $1}')" = "$node" ] && node_ip="$(echo "$n" | awk '{print $2}')"
     done < <(cfg_nodes)
     [ -n "$node_ip" ] || { log "  WARN: no IP for node $node (skip $name)"; continue; }
-    local user="root"
-    if timeout 5 ssh -o BatchMode=yes -o ConnectTimeout=3 -o StrictHostKeyChecking=accept-new "root@$node_ip" 'pct status '"$vmid"' >/dev/null 2>&1' 2>/dev/null; then
+    if timeout 5 ssh -o BatchMode=yes -o ConnectTimeout=3 -o StrictHostKeyChecking=accept-new "root@$node_ip" "$tool status $vmid >/dev/null 2>&1" 2>/dev/null; then
       log "  $name (vmid $vmid): already exists on $node — skip"
       continue
     fi
     if $DRY_RUN; then
-      log "  (dry) would create LXC $vmid ($name) on $node (ip $ip)"
+      log "  (dry) would create $type $vmid ($name) on $node (ip $ip) via $tool"
       continue
     fi
-    # Create LXC. Template + storage are configurable via env; defaults are
-    # the common homelab setup (debian-12, local-lvm).
-    local tmpl="${PCT_TEMPLATE:-local:vztmpl/debian-12-standard_12.2-1_amd64.tar.zst}"
-    local storage="${PCT_STORAGE:-local-lvm}"
-    local net=""
-    if [ "$ip" != "dhcp" ]; then
-      net="name=eth0,bridge=vmbr0,ip=${ip%/*},gw=${NET_GATEWAY:-192.168.1.1},type=veth"
+    if [ "$type" = "vm" ]; then
+      # VM: cloud-init template, disk, net. Sizing overridable via env.
+      local vm_tmpl="${QM_TEMPLATE:-local:vztmpl/debian-12-cloud-amd64.qcow2}"
+      local vm_storage="${QM_STORAGE:-local-lvm}"
+      local cores="${QM_CORES:-4}" mem="${QM_MEM:-4096}" disk="${QM_DISK:-32}"
+      ssh "root@$node_ip" \
+        "qm create $vmid --name $name --memory $mem --cores $cores --net0 virtio,bridge=vmbr0 \
+           --scsi0 $vm_storage:0,import-from=$vm_tmpl,size=${disk}G \
+           --ide2 $vm_storage:cloudinit --boot order=scsi0 \
+           --serial0 socket --vga serial0 \
+           --ipconfig0 ip=${ip}/24,gw=${NET_GATEWAY:-192.168.1.1} \
+           --agent enabled=1" \
+        || die "qm create failed for $name"
+      ssh "root@$node_ip" "qm start $vmid" || die "qm start failed for $name"
+      log "  created VM $vmid ($name) on $node"
     else
-      net="name=eth0,bridge=vmbr0,ip=dhcp,type=veth"
+      # LXC. Template + storage configurable via env; defaults are the common
+      # homelab setup (debian-12, local-lvm).
+      local tmpl="${PCT_TEMPLATE:-local:vztmpl/debian-12-standard_12.2-1_amd64.tar.zst}"
+      local storage="${PCT_STORAGE:-local-lvm}"
+      local net=""
+      if [ "$ip" != "dhcp" ]; then
+        net="name=eth0,bridge=vmbr0,ip=${ip%/*},gw=${NET_GATEWAY:-192.168.1.1},type=veth"
+      else
+        net="name=eth0,bridge=vmbr0,ip=dhcp,type=veth"
+      fi
+      ssh "root@$node_ip" \
+        "pct create $vmid $tmpl --hostname $name --memory 2048 --cores 2 --storage $storage --net0 \"$net\" --ostype debian --unprivileged 1" \
+        || die "pct create failed for $name"
+      ssh "root@$node_ip" "pct start $vmid" || die "pct start failed for $name"
+      log "  created LXC $vmid ($name) on $node"
     fi
-    ssh "root@$node_ip" \
-      "pct create $vmid $tmpl --hostname $name --memory 2048 --cores 2 --storage $storage --net0 \"$net\" --ostype debian --unprivileged 1" \
-      || die "pct create failed for $name"
-    log "  created LXC $vmid ($name) on $node"
   done < <(cfg_guests)
   log "stage 1 complete"
 }
@@ -191,9 +211,14 @@ stage_os_bootstrap() {
 }
 
 # ── Stage 3: k3s ─────────────────────────────────────────────────────────────
+# Builds a 3-node control-plane cluster (matches the live environment: all
+# three k3s nodes report control-plane,etcd), disables Traefik and ServiceLB
+# per docs/k3s-single-node-setup.md (nginx-ingress is the replacement; the
+# live cluster has no traefik/servicelb services), and extracts kubeconfig to
+# pve-core.
 
 stage_k3s() {
-  log "== stage 3: k3s cluster =="
+  log "== stage 3: k3s cluster (3 control-plane nodes) =="
   local k3s_line k3s_server k3s_nodes
   k3s_line="$(cfg_k3s)"; k3s_server="$(echo "$k3s_line" | awk '{print $1}')"
   k3s_nodes="$(echo "$k3s_line" | awk '{for(i=2;i<=NF-2;i++) printf "%s ", $i}')"
@@ -204,20 +229,27 @@ stage_k3s() {
   done < <(cfg_guests)
   [ -n "$server_ip" ] || die "no IP for k3s server $k3s_server"
   log "server: $k3s_server ($server_ip); nodes: $k3s_nodes"
+  local disable_flags="--disable traefik --disable servicelb"
+  local k3s_version="${K3S_VERSION:-v1.36.1+k3s1}"
   if $DRY_RUN; then
-    log "  (dry) would install k3s server on $k3s_server and join the rest"
+    log "  (dry) k3s $k3s_version: server --cluster-init on $k3s_server ($disable_flags)"
+    for node in $k3s_nodes; do
+      [ "$node" = "$k3s_server" ] && continue
+      log "  (dry) join $node as server (control-plane) via $server_ip:6443"
+    done
+    log "  (dry) extract kubeconfig from $k3s_server to pve-core"
     return 0
   fi
-  # Install server (idempotent)
-  ssh "npburney@$server_ip" '
-    command -v k3s >/dev/null 2>&1 || curl -sfL https://get.k3s.io | sudo sh -
+  # Install FIRST server with --cluster-init (idempotent)
+  ssh "npburney@$server_ip" "
+    command -v k3s >/dev/null 2>&1 || curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION='$k3s_version' sudo sh -s - server --cluster-init $disable_flags
     sudo systemctl enable --now k3s
-  ' || die "k3s server install failed on $k3s_server"
+  " || die "k3s server install failed on $k3s_server"
   # Extract node token
   local token
   token="$(ssh "npburney@$server_ip" 'sudo cat /var/lib/rancher/k3s/server/node-token' 2>/dev/null | tr -d '\n')"
   [ -n "$token" ] || die "could not read k3s node token"
-  # Join the rest
+  # Join the rest as SERVERS (control-plane, not agents)
   for node in $k3s_nodes; do
     [ "$node" = "$k3s_server" ] && continue
     local node_ip=""
@@ -226,11 +258,20 @@ stage_k3s() {
     done < <(cfg_guests)
     [ -n "$node_ip" ] || { log "  WARN: no IP for k3s node $node"; continue; }
     ssh "npburney@$node_ip" "
-      command -v k3s >/dev/null 2>&1 || curl -sfL https://get.k3s.io | sudo K3S_URL=https://$server_ip:6443 K3S_TOKEN='$token' sh -
-    " || die "k3s join failed on $node"
-    log "  joined $node"
+      command -v k3s >/dev/null 2>&1 || curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION='$k3s_version' sudo K3S_URL=https://$server_ip:6443 K3S_TOKEN='$token' sh -s - server $disable_flags
+      sudo systemctl enable --now k3s
+    " || die "k3s server join failed on $node"
+    log "  joined $node as control-plane"
   done
-  log "stage 3 complete (kubeconfig: extract $k3s_server:/etc/rancher/k3s/k3s.yaml to pve-core)"
+  # Extract kubeconfig to pve-core, pointing at the first server's IP.
+  log "extracting kubeconfig to $REPO_DIR/kubeconfig"
+  ssh "npburney@$server_ip" 'sudo cat /etc/rancher/k3s/k3s.yaml' \
+    | sed "s/127.0.0.1/$server_ip/g; s/^    server:.*/    server: https:\/\/$server_ip:6443/" \
+    > "$REPO_DIR/kubeconfig" 2>>"$LOG_FILE" \
+    || die "could not extract kubeconfig from $k3s_server"
+  chmod 600 "$REPO_DIR/kubeconfig"
+  log "kubeconfig written to $REPO_DIR/kubeconfig (chmod 600)"
+  log "stage 3 complete"
 }
 
 # ── Stage 4: secrets ─────────────────────────────────────────────────────────
@@ -265,19 +306,26 @@ stage_docker() {
       log "  (dry) deploy on $name ($ip): $stack"
       continue
     fi
-    # .env must exist on the host (gitignored, filled by operator)
-    local missing=""
+    # Guests do NOT have the repo. rsync each stack dir (compose + config +
+    # .env if present) to /opt/deploy/docker/<stack> on the guest, then run
+    # compose there. Fail hard: a stage that reports completion must have
+    # actually deployed (no warn-only).
     for s in $stack; do
-      ssh "root@$ip" "test -f $REPO_DIR/docker/$s/.env" 2>/dev/null || missing="$missing $s"
-    done
-    if [ -n "$missing" ]; then
-      log "  WARN: $name missing .env for:$missing (copy .env.example, fill, retry)"
-    fi
-    for s in $stack; do
+      local srcdir="$REPO_DIR/docker/$s"
+      [ -d "$srcdir" ] || { log "ERROR: docker/$s not in repo"; exit 1; }
+      local dest="/opt/deploy/docker/$s"
+      log "  rsync docker/$s -> $name:$dest"
+      rsync -a --delete -e "ssh -o BatchMode=yes -o ConnectTimeout=8" \
+        "$srcdir/" "root@$ip:$dest/" 2>>"$LOG_FILE" \
+        || { log "ERROR: rsync failed for $s on $name"; exit 1; }
+      # .env is gitignored, so it won't have rsynced; if one exists in the repo
+      # it is copied above; otherwise the operator must provide it on the guest.
       local cf="compose.yaml"
-      ssh "root@$ip" "test -f $REPO_DIR/docker/$s/docker-compose.yml" 2>/dev/null && cf="docker-compose.yml"
-      ssh "root@$ip" "cd $REPO_DIR/docker/$s && docker compose -f $cf up -d" \
-        || log "  WARN: compose up failed for $s on $name"
+      ssh "root@$ip" "test -f $dest/docker-compose.yml" 2>/dev/null && cf="docker-compose.yml"
+      ssh "root@$ip" "test -f $dest/.env" 2>/dev/null || log "  NOTE: no .env on $name for $s (copy .env.example and fill)"
+      log "  compose up $s on $name"
+      ssh "root@$ip" "cd $dest && docker compose -f $cf up -d" 2>>"$LOG_FILE" \
+        || { log "ERROR: compose up failed for $s on $name"; exit 1; }
     done
     log "  deployed stacks on $name"
   done < <(cfg_guests)

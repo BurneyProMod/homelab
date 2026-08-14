@@ -22,48 +22,17 @@ bootstrap-apply:
 deploy-k8s:
 	bash scripts/deploy-k8s.sh
 
-# deploy-docker: deploy compose stacks on ONE host only. You must say which.
+# deploy-docker: deploy compose stacks on ONE host. You must say which.
 #   make deploy-docker HOST=identity
-# Host map (source: docs/service-inventory.md, docs/docker-services.md,
-# verified 2026-08-13). Unlisted/unknown hosts are refused on purpose so a
-# stack can never be deployed onto the wrong LXC.
-#   identity (110)    lldap
-#   files    (114)    filebrowser-quantum
-#   operations (115)  scanopy
-#   authentik (118)   authentik
-#   immich   (111)    immich
-#   apps     (112)    vikunja rackpeek actual-budget tasks-md
-#   archives (113)    karakeep
-#   paperless (119)   paperless
-#   stash    (123)    stash
-#   scrutiny (124)    scrutiny-hub
-#   burndev           ollama scrutiny-collector
-#   synology          scrutiny-collector-synology
+# This is a thin wrapper over bootstrap.sh stage 5, which deploys REMOTELY
+# to the host named in config/hosts.yaml (the Makefile itself is not the
+# deploy mechanism — see scripts/bootstrap.sh). Host names come from
+# config/hosts.yaml; unknown names are refused.
+#   identity, files, operations, authentik, immich, apps, archives,
+#   paperless, stash, scrutiny, burndev, synology
 deploy-docker:
-	@test -n "$(HOST)" || (echo "ERROR: specify make deploy-docker HOST=<label>"; echo "Valid: identity files operations authentik immich apps archives paperless stash scrutiny burndev synology"; exit 1)
-	@case "$(HOST)" in \
-	  identity)   STACKS="lldap" ;; \
-	  files)      STACKS="filebrowser-quantum" ;; \
-	  operations) STACKS="scanopy" ;; \
-	  authentik)  STACKS="authentik" ;; \
-	  immich)     STACKS="immich" ;; \
-	  apps)       STACKS="vikunja rackpeek actual-budget tasks-md" ;; \
-	  archives)   STACKS="karakeep" ;; \
-	  paperless)  STACKS="paperless" ;; \
-	  stash)      STACKS="stash" ;; \
-	  scrutiny)   STACKS="scrutiny-hub" ;; \
-	  burndev)    STACKS="ollama scrutiny-collector" ;; \
-	  synology)   STACKS="scrutiny-collector-synology" ;; \
-	  *) echo "ERROR: unknown host '$(HOST)'"; echo "Valid: identity files operations authentik immich apps archives paperless stash scrutiny burndev synology"; exit 1 ;; \
-	esac; \
-	for s in $$STACKS; do \
-	  cf=""; \
-	  [ -f "docker/$$s/compose.yaml" ] && cf="docker/$$s/compose.yaml"; \
-	  [ -f "docker/$$s/docker-compose.yml" ] && cf="docker/$$s/docker-compose.yml"; \
-	  if [ -z "$$cf" ]; then echo "ERROR: no compose.yaml/docker-compose.yml in docker/$$s"; exit 1; fi; \
-	  echo "== deploying docker/$$s ($$cf) =="; \
-	  (cd docker/$$s && docker compose -f "$$cf" up -d) || exit 1; \
-	done
+	@test -n "$(HOST)" || (echo "ERROR: specify make deploy-docker HOST=<name> (name from config/hosts.yaml)"; exit 1)
+	@bash scripts/bootstrap.sh --stage 5 --only=$(HOST)
 
 backup:
 	bash scripts/backup.sh

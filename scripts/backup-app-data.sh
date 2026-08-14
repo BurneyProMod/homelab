@@ -106,11 +106,21 @@ capture_owners() { # target jump srcdir destdir
   fi
 }
 
-compose_file() { # srcdir -> compose file path, or empty
-  local dir="$1"
-  [ -f "$dir/compose.yaml" ] && { echo "$dir/compose.yaml"; return; }
-  [ -f "$dir/docker-compose.yml" ] && { echo "$dir/docker-compose.yml"; return; }
-  echo ""
+# remote_compose_file target jump srcdir -> compose file basename, or empty.
+# The check MUST run on the guest: $srcdir is a path on the remote host and
+# does not exist on the backup runner (fixed 2026-08-13; previously this ran
+# locally so quiescing silently never happened).
+remote_compose_file() { # target jump srcdir
+  local target="$1" jump="$2" srcdir="$3"
+  local name
+  if ssh_run "$target" "$jump" "test -f '$srcdir/compose.yaml'" 2>/dev/null; then
+    name="compose.yaml"
+  elif ssh_run "$target" "$jump" "test -f '$srcdir/docker-compose.yml'" 2>/dev/null; then
+    name="docker-compose.yml"
+  else
+    return 1
+  fi
+  echo "$srcdir/$name"
 }
 
 # Guests that get a postgres dump keep running (dump is the consistent artifact).
@@ -132,8 +142,8 @@ for entry in "${GUESTS[@]}"; do
   stop_again=()   # compose files to restart after copying
   if [ "$type" = "docker" ] && ! pg_label "$label" && ! $DRY_RUN; then
     for src in $sources; do
-      cf="$(compose_file "$src")"
-      [ -n "$cf" ] || { warn "no compose file at $src; cannot quiesce"; continue; }
+      cf="$(remote_compose_file "$target" "$jump" "$src")" \
+        || { warn "no compose file on guest at $src; cannot quiesce"; continue; }
       log "  stopping $src for consistent snapshot"
       if ! ssh_run "$target" "$jump" "docker compose -f '$cf' stop" 2>>"$LOG_FILE"; then
         warn "stop failed for $src; snapshot may be inconsistent"
@@ -243,9 +253,10 @@ for entry in "${K3S_NODES[@]}"; do
       "$target:/var/lib/rancher/k3s/storage/" "$dest/" 2>>"$LOG_FILE"; then
     warn "k3s rsync failed for $label"
   fi
-  # Ownership manifest (sudo: npburney reads /var/lib/rancher/k3s/storage).
+  # Ownership manifest (sudo runs the WHOLE command: npburney cannot cd into
+  # root-owned /var/lib/rancher/k3s/storage itself -- fixed 2026-08-13).
   if ! ssh "${SSH_OPTS[@]}" "$target" \
-      "cd /var/lib/rancher/k3s/storage && sudo find . -printf '%U|%G|%y|%P\\n'" > "$dest/.owners" 2>>"$LOG_FILE"; then
+      "sudo sh -c 'cd /var/lib/rancher/k3s/storage && find . -printf \"%U|%G|%y|%P\\n\"'" > "$dest/.owners" 2>>"$LOG_FILE"; then
     warn "ownership manifest failed for k3s $label"
   fi
   # Restore original replica counts.

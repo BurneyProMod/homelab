@@ -14,7 +14,7 @@
 
 services:
   ollama:
-    image: ollama/ollama:latest      # TODO: pin to a digest/tag once you settle on a version
+    image: ollama/ollama:0.32.11
     container_name: ollama
     restart: unless-stopped
     labels:

@@ -16,7 +16,7 @@ services:
       - pgdata:/var/lib/postgresql
 
   webserver:
-    image: ghcr.io/paperless-ngx/paperless-ngx:latest  # TODO: pin to versioned tag or sha256 digest when available
+    image: ghcr.io/paperless-ngx/paperless-ngx:v3.0.5
     restart: unless-stopped
     depends_on:
       - db

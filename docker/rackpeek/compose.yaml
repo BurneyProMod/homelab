@@ -2,7 +2,7 @@
 
 services:
   rackpeek:
-    image: aptacode/rackpeek:latest  # TODO: pin to versioned tag or sha256 digest when available
+    image: aptacode/rackpeek:v2.0.0
     container_name: rackpeek
     labels:
       - homepage.group=Infrastructure

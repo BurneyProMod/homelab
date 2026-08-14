@@ -75,6 +75,13 @@ while read -r g; do
   K3S_NODES+=("$local_name|npburney@$local_ip")
 done < <(cfg_guests)
 
+# postgres dumps: label|target — from config/hosts.yaml (pg_targets).
+PG_TARGETS=()
+while read -r blabel ip; do
+  [ -n "$blabel" ] || continue
+  PG_TARGETS+=("$blabel|root@$ip")
+done < <(cfg_pg_targets)
+
 ssh_run() {
   local target="$1" jump="$2"; shift 2
   if [ "$jump" != "-" ]; then
@@ -103,10 +110,20 @@ apply_owners() { # target jump destdir backupdir [sudo]
   [ "${5:-}" = "sudo" ] && sudo_prefix="sudo"
   local mf="$backupdir/.owners"
   [ -f "$mf" ] || { log "  no .owners manifest at $mf (legacy backup?)"; return 0; }
-  if ! ssh_run "$target" "$jump" \
-    "cd '$destdir' && while IFS='|' read -r u g t p; do [ -z \"\$p\" ] && p='.'; $sudo_prefix chown -h \"\$u:\$g\" \"\$p\" 2>/dev/null; done" \
-    < "$mf" 2>>"$LOG_FILE"; then
-    log "  WARN: ownership apply failed for $destdir"
+  if [ "$sudo_prefix" = "sudo" ]; then
+    # k3s nodes: npburney cannot cd into root-owned /var/lib/rancher/k3s;
+    # run the whole loop under sudo sh -c.
+    if ! ssh_run "$target" "$jump" \
+      "sudo sh -c 'cd \"$destdir\" && while IFS=\"|\" read -r u g t p; do [ -z \"\$p\" ] && p=\".\"; chown -h \"\$u:\$g\" \"\$p\" 2>/dev/null; done'" \
+      < "$mf" 2>>"$LOG_FILE"; then
+      log "  WARN: ownership apply failed for $destdir"
+    fi
+  else
+    if ! ssh_run "$target" "$jump" \
+      "cd '$destdir' && while IFS='|' read -r u g t p; do [ -z \"\$p\" ] && p='.'; chown -h \"\$u:\$g\" \"\$p\" 2>/dev/null; done" \
+      < "$mf" 2>>"$LOG_FILE"; then
+      log "  WARN: ownership apply failed for $destdir"
+    fi
   fi
 }
 
@@ -154,6 +171,36 @@ for entry in "${GUESTS[@]}"; do
       apply_owners "$target" "$jump" "/var/lib/docker/volumes/$v/_data" "$vdir"
     done
   fi
+done
+
+# ── PostgreSQL dumps ──────────────────────────────────────────────────────────
+# backup-app-data.sh writes pg_dumpall SQL dumps to postgres/<label>/all_*.sql.
+# Restore the newest dump per label by piping it into the guest's postgres
+# container (the container is assumed present/running; fail hard on error).
+
+for entry in "${PG_TARGETS[@]}"; do
+  IFS='|' read -r label target <<< "$entry"
+  if [ -n "$ONLY" ] && [ "$label" != "$ONLY" ]; then continue; fi
+  dump_dir="$BACKUP_ROOT/postgres/$label"
+  dump="$(ls -1t "$dump_dir"/all_*.sql 2>/dev/null | head -1 || true)"
+  [ -n "$dump" ] || { log "== $label: no postgres dump at $dump_dir, skipping =="; continue; }
+  log "== $label: restore postgres from $(basename "$dump") =="
+  if $DRY_RUN; then
+    log "  would: docker exec <pg container> psql -U postgres < $(basename "$dump")"
+    continue
+  fi
+  container="$(ssh_run "$target" "-" "docker ps --format {{.Names}} 2>/dev/null | grep -iE 'postgres|pgsql|db' | head -1" 2>/dev/null || true)"
+  if [ -z "$container" ]; then
+    log "ERROR: no postgres container found on $target. Aborting."
+    exit 1
+  fi
+  # Create DB/user first if this was a pg_dump (not pg_dumpall) style dump,
+  # then load. pg_dumpall includes CREATE ROLE/DB; plain psql handles both.
+  if ! ssh_run "$target" "-" "docker exec -i $container psql -U postgres" < "$dump" 2>>"$LOG_FILE"; then
+    log "ERROR: postgres restore failed for $label from $dump."
+    exit 1
+  fi
+  log "  restored $label postgres"
 done
 
 # ── k3s PVCs ──────────────────────────────────────────────────────────────────

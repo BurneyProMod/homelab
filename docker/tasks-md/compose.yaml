@@ -3,7 +3,7 @@
 
 services:
   tasks-md:
-    image: baldissaramatheus/tasks.md:latest  # TODO: pin to versioned tag when available
+    image: baldissaramatheus/tasks.md:3.3.0
     container_name: tasks.md
     env_file: .env
     ports:

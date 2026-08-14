@@ -1,7 +1,7 @@
 # https://filebrowserquantum.com
 services:
   filebrowser:
-    image: gtstef/filebrowser:stable
+    image: gtstef/filebrowser:1.5.1-stable-slim
     container_name: filebrowser-quantum
     restart: unless-stopped
     labels:

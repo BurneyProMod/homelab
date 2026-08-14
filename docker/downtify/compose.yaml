@@ -1,6 +1,6 @@
 services:
   downtify:
-    image: ghcr.io/henriquesebastiao/downtify:latest  # TODO: pin to versioned tag when available
+    image: ghcr.io/henriquesebastiao/downtify:2.10.1
     container_name: downtify
     user: 1000:1000
     environment:
