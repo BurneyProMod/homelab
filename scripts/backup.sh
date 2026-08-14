@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Off-site repo backup: push the canonical repo to the GitHub remote.
+# Off-site repo backup: push the authoritative homelab working tree on openbench
+# to the GitHub remote.
 #
-# The canonical copy lives on the NAS. The old rsync --delete mirror was
-# removed because a stale local checkout mirrored with --delete could clobber
-# the canonical copy: the self-mirror guard tested identity (source == dest)
-# not direction, so any host mounting the NAS at a different path (burndev:
-# /mnt/syn) bypassed it. Git push is content-addressed and cannot do that.
+# openbench is the authoritative dev machine (~/dev/homelab). GitHub is the
+# version-controlled remote (no secrets). The Synology copy is a separate
+# complete mirror (incl. secrets) via scripts/sync-synology.sh — never run git
+# on it.
 #
-# Runs from `make backup` and from burndev's weekly cron (which holds the
-# GitHub deploy key). Warn-don't-fail: a push error must never block the
-# app-data backup that `make backup` runs next.
+# Runs from openbench weekly cron (Sun 03:00) and `make backup`.
+# Warn-don't-fail: a push error must never block the app-data backup that
+# `make backup` runs next.
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LOG_FILE="${LOG_FILE:-/home/npburney/.local/state/homelab/backup.log}"
@@ -22,7 +22,7 @@ log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "$LOG_FILE"; }
 log "Starting homelab repo backup (off-site push)"
 
 if ! GIT_TERMINAL_PROMPT=0 git -C "$REPO_DIR" push origin main 2>>"$LOG_FILE"; then
-  log "WARN: push to origin failed (repo still safe on NAS)"
+  log "WARN: push to origin failed (repo still safe on openbench)"
 else
   log "Repo backup complete (pushed to origin)"
 fi
