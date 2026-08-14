@@ -1,6 +1,6 @@
 services:
   actual_server:
-    image: docker.io/actualbudget/actual-server:latest
+    image: docker.io/actualbudget/actual-server:26.8.1-alpine
     env_file: .env
     ports:
       # This line makes Actual available at port 5006 of the device you run the server on,

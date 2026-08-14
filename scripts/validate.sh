@@ -86,7 +86,9 @@ fi
 # ── YAML parse / lint ────────────────────────────────────────────────────────
 
 header "YAML parse"
-YAML_FILES=$(find . -path './docker/*/data' -prune -o \( -name '*.yml' -o -name '*.yaml' \) -print | grep -v '.disabled$' | sort)
+# docker/authentik/blueprints/*.yaml use authentik's custom !Env / !Find tags
+# (imported via the authentik blueprint API), not standard YAML -- skip them.
+YAML_FILES=$(find . -path './docker/*/data' -prune -o -path './docker/authentik/blueprints' -prune -o \( -name '*.yml' -o -name '*.yaml' \) -print | grep -v '.disabled$' | sort)
 
 if command -v yamllint >/dev/null 2>&1; then
   for f in $YAML_FILES; do
@@ -153,9 +155,10 @@ for stack in docker/*/; do
     ok "$stack_name: .env present"
   elif [ -f "$stack/.env.example" ]; then
     ok "$stack_name: .env absent but .env.example present"
-  elif grep -q '\${' "$stack/compose.yaml" 2>/dev/null; then
-    # Compose file references env vars but no .env or .env.example exists
-    fail "$stack_name: compose.yaml uses env vars but no .env or .env.example"
+  elif grep -q '\${' "$stack/compose.yaml" 2>/dev/null || grep -q 'env_file:' "$stack/compose.yaml" 2>/dev/null; then
+    # Compose file references env vars (${...} or env_file) but no .env or
+    # .env.example exists
+    fail "$stack_name: compose.yaml uses env vars (incl. env_file) but no .env or .env.example"
   else
     ok "$stack_name: no env vars needed"
   fi
@@ -258,7 +261,12 @@ else
 fi
 
 header "TODO placeholder images"
-TODO_IMAGES=$(grep -Hn 'image:.*TODO' $COMPOSE_FILES 2>/dev/null || true)
+# An image is a TODO placeholder only when the image VALUE contains TODO
+# before any comment (e.g. "image: TODO" or "image: foo:TODO").
+# Lines like "image: app:latest  # TODO: pin to versioned tag" are intentional
+# unpinned markers and must NOT be flagged here (they are the allow-list for
+# the unpinned-image checks above).
+TODO_IMAGES=$(grep -HnE 'image:[^#]*TODO' $COMPOSE_FILES 2>/dev/null || true)
 if [ -z "$TODO_IMAGES" ]; then
   ok "No TODO placeholder images"
 else

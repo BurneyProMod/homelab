@@ -73,7 +73,7 @@ spec:
           subPath: plugins
       containers:
       - name: manyfold
-        image: manyfold3d/manyfold:latest
+        image: manyfold3d/manyfold:v0.147.1
         ports:
         - containerPort: 3214
         env:
