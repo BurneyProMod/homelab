@@ -1,4 +1,11 @@
-# OpenChamber web UI for OpenCode agents.
+# RETIRED 2026-08-14: OpenChamber migrated OFF this container (pve-exu LXC 125)
+# to a native install on openbench (systemd user service openchamber.service,
+# http://192.168.1.199:3000). Config now lives directly in ~/.config/opencode,
+# ~/.config/openchamber, ~/.local/share/opencode, ~/.local/state/opencode on
+# openbench. This compose file and the sibling Dockerfile/entrypoint.sh are kept
+# for reference only. Do not run this stack; the LXC 125 data dir was superseded.
+#
+# Original reference (pre-migration):
 # Live on pve-exu LXC 125 (192.168.1.73). Port 3000.
 # Data dirs mirror the opencode CLI layout so sessions/settings transfer 1:1.
 services:
