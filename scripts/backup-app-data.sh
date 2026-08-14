@@ -6,11 +6,22 @@ set -euo pipefail
 # dedicated backup-runner SSH key (~/.ssh/id_ed25519_backup).
 #
 # Layout written under $BACKUP_ROOT:
-#   docker/<label>/    compose project dirs (bind-mounted data + configs)
+#   docker/<label>/<src-slug>/   compose project dirs (bind-mounted data + configs)
 #   docker/<label>/volumes/<name>/   named docker volumes (_data)
-#   native/<label>/    native (non-docker) service data dirs
+#   native/<label>/<src-slug>/   native (non-docker) service data dirs
 #   postgres/<label>/  pg_dumpall SQL dumps (crash-consistent, belt & suspenders)
 #   k8s/<node>/        local-path PVC storage per k3s node
+# Each data dir also carries a .owners manifest (uid|gid|type|relpath) captured
+# at backup time, because the unprivileged runner (uid 100000 on the NAS) cannot
+# chown on the NFS mount. Restore applies it on the guest side where it runs as
+# root. Source dirs are named by path slug (/etc/caddy -> etc_caddy) so distinct
+# paths can never collide (the old basename scheme merged /etc/caddy and
+# /var/lib/caddy into one "caddy" dir and the second rsync --delete wiped the
+# first -- fixed 2026-08-13).
+#
+# Docker guests not backed by a postgres dump are stopped (docker compose stop)
+# before their data is copied and started afterwards, so SQLite / file-backed
+# apps get a consistent snapshot. k3s PVCs are copied with workloads scaled to 0.
 #
 # Usage: bash scripts/backup-app-data.sh [--dry-run]
 
@@ -33,6 +44,10 @@ if ! mountpoint -q "$NAS_ROOT"; then
   exit 1
 fi
 
+# Path -> slug used for destination dir names in BOTH scripts.
+# /etc/caddy -> etc_caddy ; /var/lib/caddy -> var_lib_caddy
+dir_slug() { echo "$1" | sed -e 's#^/##' -e 's#/#_#g'; }
+
 # ── Manifest ──────────────────────────────────────────────────────────────────
 # label|target|jump|type|source-dirs(space sep)
 # type: docker = compose project dirs + named volumes; native = data dirs only
@@ -48,6 +63,7 @@ GUESTS=(
   "paperless|root@192.168.1.67|-|docker|/home/npburney/docker/paperless"
   "stash|root@192.168.1.68|-|docker|/home/npburney/docker/stash"
   "scrutiny|root@192.168.1.69|-|docker|/home/npburney/docker/scrutiny"
+  "operations|root@192.168.1.65|-|docker|/home/npburney/docker/scanopy"
   "jellyfin|root@192.168.1.187|-|native|/var/lib/jellyfin"
   "caddy-gpu|root@192.168.1.40|-|native|/etc/caddy /var/lib/caddy"
   "sonarr|root@10.30.0.11|root@192.168.1.40|native|/var/lib/sonarr"
@@ -62,6 +78,7 @@ PG_TARGETS=(
   "immich|root@192.168.1.61"
   "paperless|root@192.168.1.67"
   "authentik|root@192.168.1.66"
+  "operations|root@192.168.1.65"
 )
 
 K3S_NODES=(
@@ -88,20 +105,60 @@ rsync_from() { # target jump src dest
   fi
 }
 
+# capture_owners: record uid|gid|type|relpath for every entry under srcdir.
+# The runner cannot chown on the NAS, so this manifest is the ownership record;
+# restore-app-data.sh applies it on the guest (as root).
+capture_owners() { # target jump srcdir destdir
+  local target="$1" jump="$2" srcdir="$3" destdir="$4"
+  if ! ssh_run "$target" "$jump" "cd '$srcdir' && find . -printf '%U|%G|%y|%P\\n'" > "$destdir/.owners" 2>>"$LOG_FILE"; then
+    warn "ownership manifest failed for $srcdir"
+  fi
+}
+
+compose_file() { # srcdir -> compose file path, or empty
+  local dir="$1"
+  [ -f "$dir/compose.yaml" ] && { echo "$dir/compose.yaml"; return; }
+  [ -f "$dir/docker-compose.yml" ] && { echo "$dir/docker-compose.yml"; return; }
+  echo ""
+}
+
+# Guests that get a postgres dump keep running (dump is the consistent artifact).
+# Everyone else is stopped before copying so SQLite/file data is consistent.
+pg_label() { # label -> 0 if in PG_TARGETS, 1 otherwise
+  local label="$1" e
+  for e in "${PG_TARGETS[@]}"; do
+    [ "${e%%|*}" = "$label" ] && return 0
+  done
+  return 1
+}
+
 # ── Docker / native guests ────────────────────────────────────────────────────
 
 for entry in "${GUESTS[@]}"; do
   IFS='|' read -r label target jump type sources <<< "$entry"
   base="$BACKUP_ROOT/$type/$label"
   log "== $label ($target) =="
+  stop_again=()   # compose files to restart after copying
+  if [ "$type" = "docker" ] && ! pg_label "$label" && ! $DRY_RUN; then
+    for src in $sources; do
+      cf="$(compose_file "$src")"
+      [ -n "$cf" ] || { warn "no compose file at $src; cannot quiesce"; continue; }
+      log "  stopping $src for consistent snapshot"
+      if ! ssh_run "$target" "$jump" "docker compose -f '$cf' stop" 2>>"$LOG_FILE"; then
+        warn "stop failed for $src; snapshot may be inconsistent"
+      fi
+      stop_again+=("$cf")
+    done
+  fi
   for src in $sources; do
-    dest="$base/$(basename "$src")"
+    dest="$base/$(dir_slug "$src")"
     mkdir -p "$dest"
     log "  rsync $src -> $dest"
     if ! $DRY_RUN; then
       if ! rsync_from "$target" "$jump" "$src" "$dest" 2>>"$LOG_FILE"; then
         warn "rsync failed for $src (host down or path missing?)"
       fi
+      capture_owners "$target" "$jump" "$src" "$dest"
     fi
   done
   if [ "$type" = "docker" ] && ! $DRY_RUN; then
@@ -113,8 +170,15 @@ for entry in "${GUESTS[@]}"; do
       if ! rsync_from "$target" "$jump" "/var/lib/docker/volumes/$v/_data" "$vdest" 2>>"$LOG_FILE"; then
         warn "volume rsync failed for $v"
       fi
+      capture_owners "$target" "$jump" "/var/lib/docker/volumes/$v/_data" "$vdest"
     done
   fi
+  for cf in "${stop_again[@]:-}"; do
+    log "  starting $cf"
+    if ! ssh_run "$target" "$jump" "docker compose -f '$cf' start" 2>>"$LOG_FILE"; then
+      warn "START FAILED for $cf - manual intervention required"
+    fi
+  done
 done
 
 # ── Postgres dumps ────────────────────────────────────────────────────────────
@@ -151,18 +215,52 @@ for entry in "${PG_TARGETS[@]}"; do
 done
 
 # ── k3s PVC storage ───────────────────────────────────────────────────────────
+# App workloads live in the `default` and `tools` namespaces (verified 2026-08-13;
+# kube-system coredns/local-path-provisioner/metrics-server and kube-state-metrics
+# are infrastructure and must NOT be scaled). Workloads are scaled to 0 before
+# the rsync so SQLite/PVC data is consistent, then scaled back up.
 
 for entry in "${K3S_NODES[@]}"; do
   IFS='|' read -r label target <<< "$entry"
   dest="$BACKUP_ROOT/k8s/$label"
   mkdir -p "$dest"
   log "== k3s PVCs: $label ($target) =="
-  if ! $DRY_RUN; then
-    if ! rsync -aHAX --no-owner --no-group --delete --rsync-path="sudo rsync" -e "ssh ${SSH_OPTS[*]}" \
-        "$target:/var/lib/rancher/k3s/storage/" "$dest/" 2>>"$LOG_FILE"; then
-      warn "k3s rsync failed for $label"
-    fi
+  if $DRY_RUN; then
+    continue
   fi
+  # Record original replicas for default+tools, then scale those to 0.
+  repl_file="$(mktemp)"
+  for ns in default tools; do
+    if ! ssh "${SSH_OPTS[@]}" "$target" \
+        "sudo kubectl -n $ns get deploy,sts -o jsonpath='{range .items[*]}{.metadata.namespace}{\" \"}{.kind}{\" \"}{.metadata.name}{\" \"}{.spec.replicas}{\"\\n\"}{end}' 2>/dev/null" \
+        >> "$repl_file"; then
+      warn "could not read replica counts in $ns from $label; skipping PVC backup"
+      rm -f "$repl_file"
+      continue 2
+    fi
+    ssh "${SSH_OPTS[@]}" "$target" \
+      "sudo kubectl -n $ns scale deploy,sts --all --replicas=0 2>/dev/null" \
+      || warn "could not scale down $ns on $label; PVC backup may be inconsistent"
+  done
+  if ! rsync -aHAX --no-owner --no-group --delete --rsync-path="sudo rsync" -e "ssh ${SSH_OPTS[*]}" \
+      "$target:/var/lib/rancher/k3s/storage/" "$dest/" 2>>"$LOG_FILE"; then
+    warn "k3s rsync failed for $label"
+  fi
+  # Ownership manifest (sudo: npburney reads /var/lib/rancher/k3s/storage).
+  if ! ssh "${SSH_OPTS[@]}" "$target" \
+      "cd /var/lib/rancher/k3s/storage && sudo find . -printf '%U|%G|%y|%P\\n'" > "$dest/.owners" 2>>"$LOG_FILE"; then
+    warn "ownership manifest failed for k3s $label"
+  fi
+  # Restore original replica counts.
+  while read -r ns kind name replicas; do
+    [ -z "$ns" ] && continue
+    kind="$(echo "$kind" | tr '[:upper:]' '[:lower:]')"
+    if ! ssh "${SSH_OPTS[@]}" "$target" \
+        "sudo kubectl -n $ns scale $kind $name --replicas=$replicas 2>/dev/null"; then
+      warn "could not scale $ns/$name back to $replicas on $label"
+    fi
+  done < "$repl_file"
+  rm -f "$repl_file"
 done
 
 if $DRY_RUN; then
