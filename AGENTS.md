@@ -7,10 +7,11 @@ are the current source of truth. If a doc here contradicts `docs/proxmox-cluster
 
 ## Repo facts
 
-- Branch: `main`. Remote: `git@github.com:BurneyProMod/homelab.git`.
-- Canonical copy: Synology NAS, mounted on `pve-core` at
-  `/mnt/synology/homelab/repo`. Edit it there. Off-site copy is the GitHub
-  remote; `scripts/backup.sh` pushes it (warn-don't-fail, see below).
+- Branch: `main`. Remote: `git@homelab-git:BurneyProMod/homelab.git` (GitHub, no secrets).
+- Authoritative working tree: `openbench ~/dev/homelab` (git authority). Edit it there.
+  GitHub is the version-controlled remote. Synology `/volume1/homelab/repo` is a
+  one-way rsync mirror (incl. secrets/.env) via `scripts/sync-synology.sh` — never a git tree.
+  `scripts/backup.sh` pushes to GitHub (warn-don't-fail, see below).
 - Repo layout: `docker/` (compose stacks), `kubernetes/` (k3s manifests),
   `config/caddy/` + `config/step-ca/`, `scripts/`, `docs/`, `secrets/` (gitignored),
   `Makefile`.
@@ -57,7 +58,7 @@ Single source: `scripts/lib-paths.sh` — source it, never hardcode NAS paths.
   default; `--force` + typed `yes` required.
 - `scripts/backup.sh` — off-site repo backup: `git push origin main`.
   Warn-don't-fail: a push error logs WARN and exits 0, never blocking
-  `make backup`'s app-data step. The canonical repo stays on the NAS either way.
+  `make backup`'s app-data step. The repo stays safe on openbench either way.
 - `scripts/check-k8s.sh` — rollout verification + failing pods + URL summary.
 - Makefile targets that EXIST: `validate`, `up`, `deploy-k8s`, `deploy-docker`,
   `backup`, `backup-app`, `restore-dry-run`, `restore`. There is no

@@ -2,9 +2,10 @@
 
 Configuration-as-code for the Burney homelab. This repository is the **single
 source of truth** for the environment — Proxmox, k3s, Docker Compose stacks,
-Caddy, and secrets policy. The canonical copy lives on the Synology NAS
-(`/volume1/homelab/repo`, mounted on `pve-core` at
-`/mnt/synology/homelab/repo`) and mirrors to GitHub (`BurneyProMod/homelab`).
+Caddy, and secrets policy. The authoritative working tree lives on `openbench`
+at `~/dev/homelab` (git authority). GitHub is the version-controlled remote
+(`BurneyProMod/homelab`, no secrets). Synology `/volume1/homelab/repo` is a
+one-way rsync mirror of the working tree (incl. secrets/.env) — never a git tree.
 
 Status: P0 reconcile complete (repo matches live state, 2026-08-11). Commit-to-
 live automation is planned — see [docs/gitops-plan.md](docs/gitops-plan.md).
@@ -84,7 +85,7 @@ kube-state-metrics and LAN targets via blackbox. See [docs/monitoring.md](docs/m
 
 ## Quick start (operating)
 
-All commands run from the canonical repo on pve-core.
+All commands run from the authoritative working tree on `openbench` (`~/dev/homelab`).
 
 ```bash
 make validate                # pre-flight: syntax, secrets, mounts, dry-runs

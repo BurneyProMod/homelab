@@ -7,7 +7,7 @@ Mount: `192.168.1.11:/volume1/homelab`
 ## Structure
 
 ```
-repo/                          # git mirror of the homelab repo (BurneyProMod/homelab)
+repo/                          # one-way mirror of openbench ~/dev/homelab (incl. secrets/.git); NOT a git tree
 backups/
   hosts/
     burndev/                   # config backup (crontab, /opt/docker, /etc, ~/.ssh, opencode)
@@ -35,8 +35,11 @@ retired 2026-08-11 in favor of the host-aware `backups/homelab/` tree below.
 
 ## Scheduling
 
-burndev crontab:
-- repo: Sun 03:00
+openbench systemd user timer `homelab-repo-backup.timer` (Sun 03:00, Persistent=true):
+- repo off-site git push: `scripts/backup.sh`
+- Synology mirror (incl. secrets/.git): `scripts/sync-synology.sh`
+
+burndev crontab (host/service backups only; repo removed 2026-08-14):
 - burndev host: daily 01:00
 - kwsdisplay host: daily 01:30
 - grafana: daily 01:45
@@ -52,7 +55,7 @@ kubernetes 05:00) was removed when the host-aware runner moved to LXC 115.
 
 ## Restore notes
 
-- Repo/secrets: rsync `/mnt/syn/repo/` back; `--delete` safe.
+- Repo/secrets: source of truth is `openbench ~/dev/homelab` (git remote on GitHub). To restore: clone from GitHub, or rsync the Synology mirror `/volume1/homelab/repo` back. `--delete` safe (openbench is always the mirror source).
 - vzdump: restore via Proxmox UI or `vzdump --restore`.
 - Home Assistant: restore tar via the HA UI (Settings > Backups > Upload).
 - App data: `scripts/restore-app-data.sh` — manual only, never scheduled,
