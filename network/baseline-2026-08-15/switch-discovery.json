@@ -1,0 +1,236 @@
+{
+  "access_points": [
+    {
+      "mac": "8c:ed:e1:98:23:40",
+      "name": "U7 Pro",
+      "model": "U7PRO",
+      "state": "1"
+    },
+    {
+      "mac": "ac:8b:a9:4a:27:b1",
+      "name": "U6 LR",
+      "model": "UALR6v2",
+      "state": "0"
+    }
+  ],
+  "wifi_clients": [
+    {
+      "mac": "04:f0:21:35:a8:cb",
+      "hostname": "OPTIMUS",
+      "ip": "192.168.1.132",
+      "ap_mac": "8c:ed:e1:98:23:40"
+    },
+    {
+      "mac": "6c:c8:40:7b:a0:68",
+      "hostname": "emporiavue3",
+      "ip": "192.168.1.139",
+      "ap_mac": "8c:ed:e1:98:23:40"
+    },
+    {
+      "mac": "8c:4f:00:ed:20:77",
+      "hostname": "prusa-core-one-l",
+      "ip": "192.168.1.176",
+      "ap_mac": "8c:ed:e1:98:23:40"
+    },
+    {
+      "mac": "02:03:e3:ce:88:61",
+      "hostname": "iPad",
+      "ip": "192.168.1.163",
+      "ap_mac": "8c:ed:e1:98:23:40"
+    },
+    {
+      "mac": "1c:53:f9:29:97:cc",
+      "hostname": "Nest-Cam-indoor",
+      "ip": "192.168.1.140",
+      "ap_mac": "8c:ed:e1:98:23:40"
+    },
+    {
+      "mac": "6e:bb:c2:0b:e4:07",
+      "hostname": "Kevin-s-S23-Ultra",
+      "ip": "192.168.1.169",
+      "ap_mac": "8c:ed:e1:98:23:40"
+    },
+    {
+      "mac": "8e:a9:ac:f4:cd:fb",
+      "hostname": "Pixel-8-Pro",
+      "ip": "192.168.1.189",
+      "ap_mac": "8c:ed:e1:98:23:40"
+    },
+    {
+      "mac": "e8:70:72:08:3a:a7",
+      "hostname": "BroadLink-Remote-08-3a-a7",
+      "ip": "192.168.1.175",
+      "ap_mac": "8c:ed:e1:98:23:40"
+    },
+    {
+      "mac": "88:49:2d:a2:d2:f1",
+      "hostname": "",
+      "ip": "192.168.1.165",
+      "ap_mac": "8c:ed:e1:98:23:40"
+    },
+    {
+      "mac": "40:ae:30:40:1d:33",
+      "hostname": "HS300",
+      "ip": "192.168.1.105",
+      "ap_mac": "8c:ed:e1:98:23:40"
+    },
+    {
+      "mac": "f0:ef:86:f7:ed:6a",
+      "hostname": "Nest-Hello-ed6a",
+      "ip": "192.168.1.127",
+      "ap_mac": "8c:ed:e1:98:23:40"
+    },
+    {
+      "mac": "38:86:f7:11:6f:a1",
+      "hostname": "Google, Inc.",
+      "ip": "192.168.1.107",
+      "ap_mac": "8c:ed:e1:98:23:40"
+    },
+    {
+      "mac": "54:78:c9:94:3c:96",
+      "hostname": "voron24",
+      "ip": "192.168.1.123",
+      "ap_mac": "8c:ed:e1:98:23:40"
+    },
+    {
+      "mac": "d8:eb:46:1e:cf:92",
+      "hostname": "Nest-Cam",
+      "ip": "192.168.1.106",
+      "ap_mac": "8c:ed:e1:98:23:40"
+    },
+    {
+      "mac": "1c:d6:be:df:ca:2f",
+      "hostname": "Wistron Neweb Corporation",
+      "ip": "192.168.1.103",
+      "ap_mac": "8c:ed:e1:98:23:40"
+    },
+    {
+      "mac": "44:bb:3b:1f:26:3b",
+      "hostname": "Nest-Hello-263b",
+      "ip": "192.168.1.133",
+      "ap_mac": "8c:ed:e1:98:23:40"
+    },
+    {
+      "mac": "64:16:66:95:31:1e",
+      "hostname": "09AA01AC501805L3",
+      "ip": "192.168.1.117",
+      "ap_mac": "8c:ed:e1:98:23:40"
+    },
+    {
+      "mac": "54:af:97:08:d2:04",
+      "hostname": "KP115",
+      "ip": "192.168.1.186",
+      "ap_mac": "8c:ed:e1:98:23:40"
+    },
+    {
+      "mac": "00:f6:20:47:93:9c",
+      "hostname": "Google-Home-Mini",
+      "ip": "192.168.1.110",
+      "ap_mac": "8c:ed:e1:98:23:40"
+    },
+    {
+      "mac": "3c:e9:0e:e6:a5:8d",
+      "hostname": "prusa",
+      "ip": "192.168.1.190",
+      "ap_mac": "8c:ed:e1:98:23:40"
+    },
+    {
+      "mac": "44:07:0b:b0:30:6e",
+      "hostname": "Google-Home-Mini",
+      "ip": "192.168.1.104",
+      "ap_mac": "8c:ed:e1:98:23:40"
+    }
+  ],
+  "lldp_neighbors": [
+    {
+      "local_interface": "nic0",
+      "peer": "pve-exu.lan"
+    },
+    {
+      "local_interface": "nic0",
+      "peer": "U7Pro"
+    },
+    {
+      "local_interface": "nic0",
+      "peer": "pve-gpu.lan"
+    }
+  ],
+  "wired_devices": [
+    {
+      "ip": "192.168.1.32",
+      "mac": "6c:4b:90:bc:9c:61"
+    },
+    {
+      "ip": "192.168.1.11",
+      "mac": "90:09:d0:0f:ff:0d"
+    },
+    {
+      "ip": "10.30.0.15",
+      "mac": "bc:24:11:90:16:45"
+    },
+    {
+      "ip": "192.168.1.31",
+      "mac": "e8:6a:64:bf:d1:f7"
+    },
+    {
+      "ip": "192.168.1.161",
+      "mac": "8c:ed:e1:98:23:40"
+    },
+    {
+      "ip": "192.168.1.125",
+      "mac": "d8:3a:dd:67:28:75"
+    },
+    {
+      "ip": "192.168.1.199",
+      "mac": "20:12:21:68:01:a7"
+    },
+    {
+      "ip": "10.30.0.13",
+      "mac": "bc:24:11:d4:84:89"
+    },
+    {
+      "ip": "192.168.1.65",
+      "mac": "bc:24:11:e7:cc:cf"
+    },
+    {
+      "ip": "192.168.1.168",
+      "mac": "d8:3a:dd:18:ac:bb"
+    },
+    {
+      "ip": "192.168.1.50",
+      "mac": "30:9c:23:d9:6e:56"
+    },
+    {
+      "ip": "10.30.0.11",
+      "mac": "bc:24:11:cd:b2:1a"
+    },
+    {
+      "ip": "10.30.0.14",
+      "mac": "bc:24:11:be:80:ef"
+    },
+    {
+      "ip": "192.168.1.1",
+      "mac": "e4:3a:6e:5e:33:2e"
+    },
+    {
+      "ip": "192.168.1.121",
+      "mac": "bc:24:11:5a:a0:00"
+    },
+    {
+      "ip": "192.168.1.42",
+      "mac": "bc:24:11:8b:e9:40"
+    },
+    {
+      "ip": "10.30.0.12",
+      "mac": "bc:24:11:47:b4:bf"
+    },
+    {
+      "ip": "192.168.1.2",
+      "mac": "1c:2a:a3:24:22:09"
+    },
+    {
+      "ip": "192.168.1.69",
+      "mac": "bc:24:11:ae:48:69"
+    }
+  ]
+}

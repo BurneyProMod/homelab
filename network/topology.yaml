@@ -1,0 +1,70 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# network/topology.yaml — PHYSICAL network topology (single source of truth).
+#
+# This file describes ONLY physical connections: which device is plugged into
+# which switch port. It deliberately contains no transient data (no ping
+# results, no DHCP state, no speeds). Those belong in devices.yaml and
+# ip-addresses.yaml.
+#
+# Conventions:
+#   - Devices are referenced by their permanent hostname (see devices.yaml).
+#   - `a_port` / `b_port` are the physical ports on each end. "eth" = the
+#     device's onboard NIC (for non-switch end devices). Unknown ports are
+#     left blank and tracked as TODO.
+#   - The Hallway SODOLA (sw-hall) is the wall-port distribution panel: every
+#     port except p1 (router) and p7 (AP) is a home-run to a wall jack in a
+#     room. The wall run is recorded as a `note`.
+#   - Locations: sw-hall = hallway. sw-hall-core/sw-rack/sw-rack-poe/burndev/
+#     synology/proxmox hosts/kwsdisplay = Living Room (fed by SODOLA p6 wall
+#     run). sw-bedroom + its clients = Master Bedroom.
+#
+# Last verified: 2026-08-15 (physical description + switch-port mapper)
+# ─────────────────────────────────────────────────────────────────────────────
+
+links:
+  # ── Router ─────────────────────────────────────────────────────────────────
+  - { a: fw-opnsense, a_port: LAN,  b: sw-hall, b_port: 1 }
+
+  # ── sw-hall wall runs (one wall port per room) ────────────────────────────
+  - { a: sw-hall, a_port: 2,  b: thewoober,     b_port: eth, note: "Kevin's bedroom (back bedroom) wall jack" }
+  - { a: sw-hall, a_port: 3,  b: hikvision,     b_port: eth, note: "Master bedroom hallway wall jack" }
+  - { a: sw-hall, a_port: 4,  b: sw-bedroom,    b_port: 1,   note: "Master bedroom wall jack -> yuanley uplink" }
+  - { a: sw-hall, a_port: 5,  b: jeff-pc,       b_port: eth, note: "Front bedroom (Jeff's room) wall jack" }
+  - { a: sw-hall, a_port: 6,  b: sw-hall-core,  b_port: "",  note: "Living room wall jack -> metal rack (TL-SG1024DE)" }
+  # p7 = AP, direct
+  - { a: sw-hall, a_port: 7,  b: ap-hall,       b_port: eth, note: "U7 Pro, direct (not a wall run)" }
+
+  # ── sw-hall-core (TL-SG1024DE, metal rack, living room) ────────────────────
+  - { a: sw-hall-core, a_port: 1,  b: sw-poe-ap,   b_port: 1, note: "PoE switch feeding U6 LR AP" }
+  - { a: sw-hall-core, a_port: 3,  b: hue-bridge,  b_port: eth, note: "Philips Hue Bridge (in metal rack)" }
+  - { a: sw-hall-core, a_port: 7,  b: android-tv,  b_port: eth, note: "Android TV (left of metal rack)" }
+  - { a: sw-hall-core, a_port: 23, b: burndev,     b_port: eth, note: "burndev (right of KWS rack)" }
+  - { a: sw-hall-core, a_port: 24, b: sw-rack,     b_port: 1,   note: "uplink -> GS308E main/trunk (KWS rack)" }
+
+  # ── sw-rack (GS308E, KWS rack bottom) ──────────────────────────────────────
+  - { a: sw-rack, a_port: 3, b: synology,     b_port: eth }
+  - { a: sw-rack, a_port: 4, b: pve-gpu,      b_port: eth }
+  - { a: sw-rack, a_port: 5, b: pve-core,     b_port: eth }
+  - { a: sw-rack, a_port: 6, b: pve-exu,      b_port: eth }
+  - { a: sw-rack, a_port: 7, b: sw-rack-poe,  b_port: 8, note: "uplink -> tp-ls108" }
+  - { a: sw-rack, a_port: 8, b: kwsdisplay,   b_port: eth }
+  # p1 = Main/Trunk (uplink to sw-hall-core p24) — see above
+  # p2 = unused/empty (previously labelled 'NAS1', nothing attached)
+
+  # ── sw-rack-poe (tp-ls108, KWS rack top, PoE) ──────────────────────────────
+  - { a: sw-rack-poe, a_port: 1, b: kws-rpi-1,     b_port: eth }
+  - { a: sw-rack-poe, a_port: 2, b: homeassistant, b_port: eth }
+
+  # ── sw-bedroom (yuanley, master bedroom) ───────────────────────────────────
+  - { a: sw-bedroom, a_port: 2, b: desktop-3u0m8bh, b_port: eth }
+  - { a: sw-bedroom, a_port: 3, b: pikvm,           b_port: eth }
+  - { a: sw-bedroom, a_port: 4, b: openbench,       b_port: eth }
+  # p1 = uplink to sw-hall p4 (see above)
+
+# ── Known open TODOs ─────────────────────────────────────────────────────────
+#   - sw-hall-core uplink port (from SODOLA p6 / living room wall jack) — which
+#     TL-SG1024DE port the wall run plugs into: TODO, confirm.
+#   - sw-hall-core ports 2,4-22 other than those listed: confirm empty vs used.
+#   - GS308E port 2: empty per mapper (was labelled 'NAS1').
+#   - tp-ls108 ports 3-7: unused (only p1,p2,p8 in use).
+#   - sw-hall p8: empty.

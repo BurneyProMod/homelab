@@ -1,0 +1,139 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# network/ip-addresses.yaml — IP address plan (192.168.1.0/24).
+#
+# Classification (goal 10) + current assignments. Reference hostnames first,
+# IPs second. Do NOT renumber anything yet — this is the as-built plan.
+#
+# DHCP pool (from OPNsense/dnsmasq backup, 2026-08-15):
+#   LAN:   192.168.1.100 - 192.168.1.199
+#   opt1:  192.168.2.50  - 192.168.2.199  ("MGMT VLAN DHCP")
+#   opt4:  192.168.99.100- 192.168.99.199
+#
+# Current allocation map (see devices.yaml for hardware details).
+# ─────────────────────────────────────────────────────────────────────────────
+
+classes:
+  networking:            "switches, router, APs, firewall"
+  hypervisors:           "Proxmox host nodes"
+  servers:               "physical standalone servers"
+  vms_lxcs:              "virtual guests (LXCs/VMs) on Proxmox"
+  home_automation:       "Home Assistant + IoT controllers"
+  iot_wifi:              "WiFi IoT devices (cameras, plugs, sensors, printers)"
+  trusted_clients:       "family PCs / workstations / phones"
+  transient_dhcp:        "unidentified / intermittent DHCP clients"
+
+# Reserved host addresses (low end of /24, not in DHCP pool)
+reserved:
+  - { ip: "192.168.1.1",   hostname: fw-opnsense,    class: networking,     assignment: static }
+  - { ip: "192.168.1.2",   hostname: "",             class: unknown,        assignment: unknown, notes: "MAC 1c:2a:a3:24:22:09 (Shenzhen HongRui Optical) — identify" }
+  - { ip: "192.168.1.10",  hostname: caddy-vip,      class: networking,     assignment: static, notes: "keepalived VIP for *.burney.network (HA Caddy pair)" }
+  - { ip: "192.168.1.11",  hostname: synology,       class: servers,        assignment: static }
+  # 192.168.1.12 - 192.168.1.29 unused/reserved
+
+# Hypervisors
+hypervisors:
+  - { ip: "192.168.1.30",  hostname: pve-core,  mac: "e8:6a:64:f2:62:f9", assignment: static }
+  - { ip: "192.168.1.31",  hostname: pve-exu,   mac: "e8:6a:64:bf:d1:f7", assignment: static }
+  - { ip: "192.168.1.32",  hostname: pve-gpu,   mac: "6c:4b:90:bc:9c:61", assignment: static }
+
+# Virtual guests (LXCs/VMs). mac prefix bc:24:11 = Proxmox bridge MAC pool.
+vms_lxcs:
+  # pve-gpu guests
+  - { ip: "192.168.1.40",  hostname: caddy,      mac: "bc:24:11:cf:42:70", node: pve-gpu, vmid: 101, role: edge }
+  - { ip: "192.168.1.187", hostname: jellyfin,   mac: "",                   node: pve-gpu, vmid: 100, role: media }
+  - { ip: "192.168.1.72",  hostname: k3s-gpu,    mac: "",                   node: pve-gpu, vmid: 122, role: k3s }
+  # pve-core guests
+  - { ip: "192.168.1.42",  hostname: caddy,      mac: "bc:24:11:8b:e9:40", node: pve-core, vmid: 103, role: edge }
+  - { ip: "192.168.1.60",  hostname: identity,   mac: "",                   node: pve-core, vmid: 110, role: auth }
+  - { ip: "192.168.1.64",  hostname: files,      mac: "",                   node: pve-core, vmid: 114, role: apps }
+  - { ip: "192.168.1.65",  hostname: operations, mac: "bc:24:11:e7:cc:cf", node: pve-core, vmid: 115, role: ops }
+  - { ip: "192.168.1.66",  hostname: authentik,  mac: "bc:24:11:3d:fc:ef", node: pve-core, vmid: 118, role: auth }
+  - { ip: "192.168.1.70",  hostname: k3s-core,   mac: "",                   node: pve-core, vmid: 120, role: k3s }
+  - { ip: "192.168.1.121", hostname: homelable,  mac: "bc:24:11:5a:a0:00", node: pve-core, vmid: 104, role: infra-map }
+  # pve-exu guests
+  - { ip: "192.168.1.61",  hostname: immich,     mac: "bc:24:11:db:9e:5f", node: pve-exu, vmid: 111, role: apps }
+  - { ip: "192.168.1.62",  hostname: docker-apps, mac: "bc:24:11:19:1d:65", node: pve-exu, vmid: 112, role: apps }
+  - { ip: "192.168.1.63",  hostname: archives,   mac: "",                   node: pve-exu, vmid: 113, role: apps }
+  - { ip: "192.168.1.67",  hostname: paperless,  mac: "bc:24:11:6e:dd:71", node: pve-exu, vmid: 119, role: apps }
+  - { ip: "192.168.1.68",  hostname: stash,      mac: "bc:24:11:98:1b:94", node: pve-exu, vmid: 123, role: apps }
+  - { ip: "192.168.1.69",  hostname: scrutiny,   mac: "bc:24:11:ae:48:69", node: pve-exu, vmid: 124, role: apps }
+  - { ip: "192.168.1.71",  hostname: k3s-exu,    mac: "bc:24:11:f7:01:8d", node: pve-exu, vmid: 121, role: k3s }
+  - { ip: "192.168.1.73",  hostname: openchamber, mac: "bc:24:11:18:04:81", node: pve-exu, vmid: 125, role: apps }
+  # media subnet (behind caddy LXC 101 proxy jump)
+  - { ip: "10.30.0.11", hostname: sonarr,   mac: "bc:24:11:cd:b2:1a", node: pve-gpu, vmid: 201, role: media }
+  - { ip: "10.30.0.12", hostname: radarr,   mac: "bc:24:11:47:b4:bf", node: pve-gpu, vmid: 202, role: media }
+  - { ip: "10.30.0.13", hostname: lidarr,   mac: "bc:24:11:d4:84:89", node: pve-gpu, vmid: 203, role: media }
+  - { ip: "10.30.0.14", hostname: prowlarr, mac: "bc:24:11:be:80:ef", node: pve-gpu, vmid: 204, role: media }
+  - { ip: "10.30.0.15", hostname: qbit,     mac: "bc:24:11:90:16:45", node: pve-gpu, vmid: 205, role: media }
+
+# Standalone servers / management
+servers:
+  - { ip: "192.168.1.50",  hostname: burndev,        mac: "30:9c:23:d9:6e:56", assignment: static }
+  - { ip: "192.168.1.125", hostname: kws-rpi-1,      mac: "d8:3a:dd:67:28:75", assignment: static }
+  - { ip: "192.168.1.168", hostname: kwsdisplay,     mac: "d8:3a:dd:18:ac:bb", assignment: static }
+  - { ip: "192.168.1.115", hostname: sw-hall-core,   mac: "",                   assignment: static, notes: "TL-SG1024DE" }
+
+# Home automation
+home_automation:
+  - { ip: "192.168.1.129", hostname: homeassistant, mac: "dc:a6:32:8a:e4:87", assignment: static }
+  - { ip: "192.168.1.180", hostname: hue-bridge,    mac: "ec:b5:fa:06:84:9b", assignment: dhcp, notes: "Philips Hue, in DHCP pool" }
+
+# Trusted wired clients / workstations
+trusted_clients:
+  - { ip: "192.168.1.100", hostname: desktop-3u0m8bh, mac: "e8:9c:25:6d:4b:b2", assignment: dhcp, location: "Master Bedroom", switch_port: "sw-bedroom p2" }
+  - { ip: "192.168.1.102", hostname: jeff-pc,         mac: "a8:a1:59:a6:e2:be", assignment: dhcp, location: "Front Bedroom",  switch_port: "sw-hall p5" }
+  - { ip: "192.168.1.197", hostname: pikvm,           mac: "e4:5f:01:e4:92:c9", assignment: static }
+  - { ip: "192.168.1.199", hostname: openbench,       mac: "20:12:21:68:01:a7", assignment: dhcp, location: "Master Bedroom", switch_port: "sw-bedroom p4" }
+  - { ip: "",              hostname: thewoober,       mac: "",                   assignment: dhcp, location: "Back Bedroom (Kevin)", switch_port: "sw-hall p2", notes: "IP not captured (offline)" }
+  - { ip: "",              hostname: android-tv,      mac: "",                   assignment: dhcp, location: "Living Room", switch_port: "sw-hall-core p7" }
+  - { ip: "192.168.1.161", hostname: ap-hall,         mac: "8c:ed:e1:98:23:40", assignment: dhcp, location: "Hallway", switch_port: "sw-hall p7" }
+
+# WiFi IoT devices (from UniFi controller, all on U7 Pro)
+iot_wifi:
+  - { ip: "192.168.1.139", hostname: emporiavue3,        mac: "6c:c8:40:7b:a0:68" }
+  - { ip: "192.168.1.176", hostname: prusa-core-one-l,   mac: "8c:4f:00:ed:20:77" }
+  - { ip: "192.168.1.190", hostname: prusa,              mac: "3c:e9:0e:e6:a5:8d" }
+  - { ip: "192.168.1.123", hostname: voron24,            mac: "54:78:c9:94:3c:96" }
+  - { ip: "192.168.1.105", hostname: hs300,              mac: "40:ae:30:40:1d:33" }
+  - { ip: "192.168.1.186", hostname: kp115,              mac: "54:af:97:08:d2:04" }
+  - { ip: "192.168.1.140", hostname: nest-cam-indoor,    mac: "1c:53:f9:29:97:cc" }
+  - { ip: "192.168.1.106", hostname: nest-cam,           mac: "d8:eb:46:1e:cf:92" }
+  - { ip: "192.168.1.133", hostname: nest-hello-263b,    mac: "44:bb:3b:1f:26:3b" }
+  - { ip: "192.168.1.127", hostname: nest-hello-ed6a,    mac: "f0:ef:86:f7:ed:6a" }
+  - { ip: "192.168.1.117", hostname: nest-09AA01AC501805L3, mac: "64:16:66:95:31:1e" }
+  - { ip: "192.168.1.110", hostname: google-home-mini,   mac: "00:f6:20:47:93:9c" }
+  - { ip: "192.168.1.104", hostname: google-home-mini,   mac: "44:07:0b:b0:30:6e" }
+  - { ip: "192.168.1.107", hostname: google-device,      mac: "38:86:f7:11:6f:a1" }
+  - { ip: "192.168.1.175", hostname: broadlink-remote,   mac: "e8:70:72:08:3a:a7" }
+  - { ip: "192.168.1.163", hostname: ipad,               mac: "02:03:e3:ce:88:61" }
+  - { ip: "192.168.1.165", hostname: "",                 mac: "88:49:2d:a2:d2:f1", notes: "Shenzhen Bilian — identify" }
+  - { ip: "192.168.1.103", hostname: wifi-1c-d6-be,      mac: "1c:d6:be:df:ca:2f", notes: "Wistron Neweb (smart TV/device) — identify" }
+
+# Trusted WiFi mobile clients (phones/laptops)
+wifi_mobile:
+  - { ip: "192.168.1.189", hostname: pixel-8-pro,    mac: "8e:a9:ac:f4:cd:fb" }
+  - { ip: "192.168.1.169", hostname: kevin-s23,      mac: "6e:bb:c2:0b:e4:07" }
+  - { ip: "192.168.1.132", hostname: optimus,        mac: "04:f0:21:35:a8:cb" }
+
+# Transient / unidentified / stale
+transient:
+  - { ip: "192.168.1.150", hostname: "", mac: "", notes: "Intermittent DHCP client; offline at scan. Appeared across multiple branches in mapper = transient/flaky. Identify." }
+  - { ip: "192.168.1.101", hostname: "", mac: "a0:ad:9f:85:b7:38", notes: "ASUSTek device (wired) — identify" }
+  - { ip: "192.168.1.198", hostname: "", mac: "bc:24:11:f6:05:2a", notes: "Former/stopped Proxmox guest (stale lease); not in any current guest config" }
+  - { ip: "192.168.1.3",   hostname: "", mac: "", notes: "Unresolved low-address probe target" }
+  - { ip: "192.168.1.4",   hostname: "", mac: "", notes: "Unresolved" }
+  - { ip: "192.168.1.5",   hostname: "", mac: "", notes: "Unresolved" }
+  - { ip: "192.168.1.6",   hostname: "", mac: "", notes: "Unresolved" }
+  - { ip: "192.168.1.7",   hostname: "", mac: "", notes: "Unresolved" }
+  - { ip: "192.168.1.9",   hostname: "", mac: "", notes: "Unresolved" }
+
+# ── Future allocation ranges (goal 10 — plan only, do not apply) ─────────────
+# Propose, once core switch + VLAN strategy are decided:
+future_ranges:
+  - { class: networking,     range: "192.168.1.1 - 192.168.1.19" }
+  - { class: hypervisors,    range: "192.168.1.20 - 192.168.1.39" }
+  - { class: servers,        range: "192.168.1.40 - 192.168.1.59" }
+  - { class: vms_lxcs,       range: "192.168.1.60 - 192.168.1.99" }
+  - { class: dhcp_pool,      range: "192.168.1.100 - 192.168.1.199" }
+  # Note: current assignments already roughly follow this shape (hypervisors
+  # .30-.32, servers .40-.59, guests .60-.99) — good, keep it.
