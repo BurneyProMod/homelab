@@ -99,3 +99,27 @@ Allow rules:
 - `allow-monitoring.yml` — permits traffic from `monitoring` namespace (Prometheus scraping)
 
 Any new app in `tools` namespace must have an ingress allow rule or it will be unreachable.
+
+## Network Device Inventory
+
+The homelab switches are **unmanaged** (verified 2026-08-15): the UniFi controller
+on `kws-rpi-1` manages only the two access points (U7 Pro, U6 LR) and **no
+managed switches**, so a per-port "switch port → device" map is not available.
+Unmanaged switches provide no MAC table, SNMP, or LLDP of their own.
+
+Use `scripts/switch-discovery.sh` for the closest achievable picture — a device
+inventory built from three sources:
+
+- **UniFi controller** (`unifi.local:11443`): APs + WiFi clients (MAC, hostname, IP, AP).
+- **Host LLDP** (via pve-core): physical host-to-host adjacency.
+- **ARP + DNS** (via pve-core): MAC → IP → hostname for wired devices.
+
+Requires UniFi local-admin credentials at `~/.secrets/unifi` (`username=` /
+`password=`) and key-based SSH to pve-core. Run with no args for a table,
+`--json` for structured output, or `--ap-only` to skip the SSH sources.
+
+```bash
+bash scripts/switch-discovery.sh        # device inventory table
+bash scripts/switch-discovery.sh --json # structured JSON
+```
+

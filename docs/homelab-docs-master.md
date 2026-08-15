@@ -43,6 +43,7 @@ troubleshooting guides, and security policies.
 |----------|-------------|
 | [pi-agent-setup.md](pi-agent-setup.md) | Pi coding agent configuration, sessions, skills, MCP servers |
 | [vikunja-management.md](vikunja-management.md) | Vikunja project organization, CSV import, best practices |
+| `scripts/switch-discovery.sh` | Network device inventory (UniFi APs/clients + LLDP + ARP/DNS) |
 
 ### Projects
 
