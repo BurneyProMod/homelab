@@ -85,7 +85,7 @@ trusted_clients:
   - { ip: "192.168.1.102", hostname: jeff-pc,         mac: "a8:a1:59:a6:e2:be", assignment: dhcp, location: "Front Bedroom",  switch_port: "sw-core p5" }
   - { ip: "192.168.1.197", hostname: pikvm,           mac: "e4:5f:01:e4:92:c9", assignment: static }
   - { ip: "192.168.1.199", hostname: openbench,       mac: "20:12:21:68:01:a7", assignment: dhcp, location: "Master Bedroom", switch_port: "sw-masbed p4" }
-  - { ip: "",              hostname: thewoober,       mac: "",                   assignment: dhcp, location: "Back Bedroom (Kevin)", switch_port: "sw-core p2", notes: "IP not captured (offline)" }
+  - { ip: "192.168.1.101", hostname: thewoober,       mac: "a0:ad:9f:85:b7:38", assignment: dhcp, location: "Back Bedroom (Kevin)", switch_port: "sw-core p2", notes: "Kevin's gaming PC (dnsmasq host binding)" }
   - { ip: "",              hostname: android-tv,      mac: "",                   assignment: dhcp, location: "Living Room", switch_port: "sw-livrom p7" }
   - { ip: "192.168.1.161", hostname: ap-hall,         mac: "8c:ed:e1:98:23:40", assignment: dhcp, location: "Hallway", switch_port: "sw-core p7" }
 
@@ -119,7 +119,6 @@ wifi_mobile:
 # Transient / unidentified / stale
 transient:
   - { ip: "192.168.1.150", hostname: "", mac: "", notes: "Intermittent DHCP client; offline at scan. Appeared across multiple branches in mapper = transient/flaky. Identify." }
-  - { ip: "192.168.1.101", hostname: thewoober, mac: "a0:ad:9f:85:b7:38", notes: "Kevin's gaming PC (per dnsmasq hosts)" }
   - { ip: "", hostname: hibyr4_eva, mac: "22:30:46:48:7e:03", notes: "dnsmasq host entry; locally-administered MAC — identify" }
   - { ip: "192.168.1.198", hostname: "", mac: "bc:24:11:f6:05:2a", notes: "Former/stopped Proxmox guest (stale lease); not in any current guest config" }
   - { ip: "192.168.1.3",   hostname: "", mac: "", notes: "Unresolved low-address probe target" }
