@@ -1,0 +1,30 @@
+#
+# Immich machine-learning (standalone, openbench host)
+#
+# Runs on openbench (192.168.1.199) using the RTX 2060 SUPER via CUDA.
+# Replaced the ROCm container that crash-looped on pve-gpu LXC 111:
+# ROCm 7.2 ships no gfx900 rocBLAS library for the HSA_OVERRIDE_GFX_VERSION=9.0.0
+# Raven Ridge override, so the OCR model compile SIGABRTs, dumping core files
+# until the root fs fills and the immich server crashes.
+#
+# The immich server (pve-gpu LXC 111) points here via:
+#   IMMICH_MACHINE_LEARNING_URL=http://192.168.1.199:3003
+#
+# Deploy: docker compose up -d  (from this directory)
+
+name: immich-ml
+
+services:
+  machine-learning:
+    container_name: immich-machine-learning
+    image: ghcr.io/immich-app/immich-machine-learning:${IMMICH_VERSION:-release}-cuda
+    restart: always
+    gpus: all
+    ports:
+      - '3003:3003'
+    environment:
+      - DEVICE=cuda
+      - MACHINE_LEARNING_CACHE_FOLDER=/cache
+      - IMMICH_VERSION=${IMMICH_VERSION:-release}
+    volumes:
+      - ./cache:/cache
