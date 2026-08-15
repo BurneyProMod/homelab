@@ -196,7 +196,7 @@ devices:
     purpose: "NAS / backup storage (/volume1/homelab)"
     mgmt_url: "https://192.168.1.11:5001"
     poe: false
-    notes: "Backup mirror of homelab repo. GS308E p2 label 'NAS1' is a separate empty port."
+    notes: "Backup mirror of homelab repo. Dual NIC: 90:09:d0:0f:ff:0d (openbench view) + 90:09:d0:0f:ff:0e (OPNsense view); GS308E p2 'NAS1' is the second NIC's port."
 
   - hostname: kwsdisplay
     mgmt_ip: "192.168.1.168"
@@ -341,6 +341,19 @@ devices:
     mgmt_url: ""
     poe: false
     notes: "IP/MAC not captured at scan time."
+
+  - hostname: fika-server
+    mgmt_ip: "192.168.1.114"
+    mac: ""
+    model: "(unknown — game server)"
+    location: ""
+    switch: ""
+    switch_port: ""
+    speed: 1
+    purpose: "Fika SPT (co-op Tarkov) game server"
+    mgmt_url: ""
+    poe: false
+    notes: "Found via OPNsense port-forwards (TCP 6969, UDP 25565). Physical location/port unknown — identify."
 
   - hostname: hue-bridge
     mgmt_ip: "192.168.1.180"

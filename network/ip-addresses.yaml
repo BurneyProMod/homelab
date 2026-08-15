@@ -42,7 +42,7 @@ vms_lxcs:
   # pve-gpu guests
   - { ip: "192.168.1.40",  hostname: caddy,      mac: "bc:24:11:cf:42:70", node: pve-gpu, vmid: 101, role: edge }
   - { ip: "192.168.1.187", hostname: jellyfin,   mac: "",                   node: pve-gpu, vmid: 100, role: media }
-  - { ip: "192.168.1.72",  hostname: k3s-gpu,    mac: "",                   node: pve-gpu, vmid: 122, role: k3s }
+  - { ip: "192.168.1.72",  hostname: k3s-gpu,    mac: "bc:24:11:34:0c:c8",   node: pve-gpu, vmid: 122, role: k3s }
   # pve-core guests
   - { ip: "192.168.1.42",  hostname: caddy,      mac: "bc:24:11:8b:e9:40", node: pve-core, vmid: 103, role: edge }
   - { ip: "192.168.1.60",  hostname: identity,   mac: "",                   node: pve-core, vmid: 110, role: auth }
@@ -115,6 +115,10 @@ wifi_mobile:
   - { ip: "192.168.1.189", hostname: pixel-8-pro,    mac: "8e:a9:ac:f4:cd:fb" }
   - { ip: "192.168.1.169", hostname: kevin-s23,      mac: "6e:bb:c2:0b:e4:07" }
   - { ip: "192.168.1.132", hostname: optimus,        mac: "04:f0:21:35:a8:cb" }
+
+# Non-Proxmox servers found via firewall rules
+servers_extra:
+  - { ip: "192.168.1.114", hostname: fika-server, mac: "", notes: "Fika SPT game server (port-forwards 6969/25565) — identify" }
 
 # Transient / unidentified / stale
 transient:
