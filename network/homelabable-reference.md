@@ -88,13 +88,13 @@ All WiFi, associated to ap-hall (U7 Pro) unless noted. No switch port — attach
   - `google-device`  ip=192.168.1.107  mac=38:86:f7:11:6f:a1
   - `broadlink-remote`  ip=192.168.1.175  mac=e8:70:72:08:3a:a7
   - `ipad`  ip=192.168.1.163  mac=02:03:e3:ce:88:61
+  - `optimus`  ip=192.168.1.132  mac=04:f0:21:35:a8:cb  (security system panel)
   - `?`  ip=192.168.1.165  mac=88:49:2d:a2:d2:f1  (Shenzhen Bilian — identify)
   - `wifi-1c-d6-be`  ip=192.168.1.103  mac=1c:d6:be:df:ca:2f  (Wistron Neweb (smart TV/device) — identify)
 
 ### Mobile / personal (WiFi)
   - `pixel-8-pro`  ip=192.168.1.189  mac=8e:a9:ac:f4:cd:fb
   - `kevin-s23`  ip=192.168.1.169  mac=6e:bb:c2:0b:e4:07
-  - `optimus`  ip=192.168.1.132  mac=04:f0:21:35:a8:cb
 
 ### Wired IoT (already in physical section)
   - hikvision (camera, closet jack), hue-bridge (living room)

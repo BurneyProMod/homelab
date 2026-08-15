@@ -106,6 +106,7 @@ iot_wifi:
   - { ip: "192.168.1.104", hostname: google-home-mini,   mac: "44:07:0b:b0:30:6e" }
   - { ip: "192.168.1.107", hostname: google-device,      mac: "38:86:f7:11:6f:a1" }
   - { ip: "192.168.1.175", hostname: broadlink-remote,   mac: "e8:70:72:08:3a:a7" }
+  - { ip: "192.168.1.132", hostname: optimus,            mac: "04:f0:21:35:a8:cb", notes: "Security system panel" }
   - { ip: "192.168.1.163", hostname: ipad,               mac: "02:03:e3:ce:88:61" }
   - { ip: "192.168.1.165", hostname: "",                 mac: "88:49:2d:a2:d2:f1", notes: "Shenzhen Bilian — identify" }
   - { ip: "192.168.1.103", hostname: wifi-1c-d6-be,      mac: "1c:d6:be:df:ca:2f", notes: "Wistron Neweb (smart TV/device) — identify" }
@@ -114,7 +115,6 @@ iot_wifi:
 wifi_mobile:
   - { ip: "192.168.1.189", hostname: pixel-8-pro,    mac: "8e:a9:ac:f4:cd:fb" }
   - { ip: "192.168.1.169", hostname: kevin-s23,      mac: "6e:bb:c2:0b:e4:07" }
-  - { ip: "192.168.1.132", hostname: optimus,        mac: "04:f0:21:35:a8:cb" }
 
 # Transient / unidentified / stale
 transient:
