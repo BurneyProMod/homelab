@@ -155,8 +155,9 @@ def main() -> None:
             "target": b_id,
             "type": "ethernet",
             "label": lk.get("note") or "",
-            "source_handle": lk.get("a_port") or None,
-            "target_handle": lk.get("b_port") or None,
+            # handles are strings in the API schema; coerce ports (may be ints)
+            "source_handle": (str(lk.get("a_port")) if lk.get("a_port") else None),
+            "target_handle": (str(lk.get("b_port")) if lk.get("b_port") else None),
         }
         match = next((e for e in existing_edges
                       if {e["source"], e["target"]} == {a_id, b_id}), None)
