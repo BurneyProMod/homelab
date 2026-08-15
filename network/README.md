@@ -26,12 +26,12 @@ everywhere (Trilium notes, labels, DNS, this repo).
 | Hostname | Device | Model | Location |
 |----------|--------|-------|----------|
 | `fw-opnsense` | router | Shenzhen Zeroone mini PC (OPNsense) | Hallway |
-| `sw-hall` | access switch | SODOLA 8-port (unmanaged) | Hallway |
-| `sw-hall-core` | core switch | TP-Link TL-SG1024DE | Living Room (metal rack) |
-| `sw-poe-ap` | PoE switch | TP-Link TL-SF1005P | Living Room |
-| `sw-rack` | rack switch | Netgear GS308E | Living Room (KWS rack bottom) |
-| `sw-rack-poe` | PoE rack switch | TP-Link tp-ls108 | Living Room (KWS rack top) |
-| `sw-bedroom` | bedroom switch | yuanley ys25-0402 | Master Bedroom |
+| `sw-core` | access switch | SODOLA 8-port (unmanaged) | Hallway |
+| `sw-livrom` | core switch | TP-Link TL-SG1024DE | Living Room (metal rack) |
+| `sw-livrom-poe` | PoE switch | TP-Link TL-SF1005P | Living Room |
+| `sw-kws` | rack switch | Netgear GS308E | Living Room (KWS rack bottom) |
+| `sw-kws-poe` | PoE rack switch | TP-Link tp-ls108 | Living Room (KWS rack top) |
+| `sw-masbed` | bedroom switch | yuanley ys25-0402 | Master Bedroom |
 | `ap-hall` | access point | Ubiquiti U7 Pro | Hallway |
 | `ap-u6-lr` | access point | Ubiquiti U6 LR | (offline) |
 
@@ -43,17 +43,16 @@ homeassistant, pikvm, openbench, etc.) are kept as-is.
 Label **both ends** of every important cable. Format:
 
 ```
-HALL-SW P06 ↔ LR-WALL
-LR-WALL    ↔ TL1024 P??
-TL1024 P24 ↔ RACK-GS308 P01
-GS308 P07  ↔ RACK-POE P08
-RACK-POE P01 ↔ KWS-RPI1
-RACK-POE P02 ↔ HA
+SW-CORE P06 ↔ LR-WALL
+LR-WALL     ↔ SW-LIVROM P??
+SW-LIVROM P24 ↔ SW-KWS P01
+SW-KWS P07    ↔ SW-KWS-POE P08
+SW-KWS-POE P01 ↔ KWS-RPI1
+SW-KWS-POE P02 ↔ HA
 ```
 
 Priority: switch uplinks, Proxmox hosts, APs, NAS (Synology), OPNsense,
-Home Assistant, PiKVM. Use the hostnames above (e.g. `SW-HALL P06`) — not the
-raw model names.
+Home Assistant, PiKVM. Use the hostnames above — not the raw model names.
 
 ## Verification workflow (goal 26)
 

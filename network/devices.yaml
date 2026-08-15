@@ -30,7 +30,7 @@ devices:
     mac: "e4:3a:6e:5e:33:2e"
     model: "Shenzhen Zeroone mini PC (OPNsense)"
     location: "Hallway"
-    switch: "sw-hall"
+    switch: "sw-core"
     switch_port: "1"
     speed: 1
     purpose: "Router / firewall / DHCP / DNS (OPNsense)"
@@ -38,7 +38,7 @@ devices:
     poe: false
     notes: "Default gateway. DHCP pool 192.168.1.100-199 (dnsmasq)."
 
-  - hostname: sw-hall
+  - hostname: sw-core
     mgmt_ip: ""
     mac: ""
     model: "SODOLA 8-port switch (unmanaged)"
@@ -51,12 +51,12 @@ devices:
     poe: false
     notes: "p1 router, p2 Kevin bdrm, p3 MBR hallway, p4 MBR (yuanley), p5 Front bdrm (Jeff), p6 Living room (rack), p7 U7 Pro AP, p8 empty."
 
-  - hostname: sw-hall-core
+  - hostname: sw-livrom
     mgmt_ip: "192.168.1.115"
     mac: ""
     model: "TP-Link TL-SG1024DE (24-port smart switch)"
     location: "Living Room (metal rack)"
-    switch: "sw-hall"
+    switch: "sw-core"
     switch_port: "6"
     speed: 1
     purpose: "Core aggregation switch (24-port managed)"
@@ -64,25 +64,25 @@ devices:
     poe: false
     notes: "Metal rack holds this + Philips Hue Bridge. Android TV to left, KWS rack to right."
 
-  - hostname: sw-poe-ap
+  - hostname: sw-livrom-poe
     mgmt_ip: ""
     mac: ""
     model: "TP-Link TL-SF1005P (5-port PoE switch, 10/100)"
     location: "Living Room"
-    switch: "sw-hall-core"
+    switch: "sw-livrom"
     switch_port: "1"
     speed: 0.1
     purpose: "PoE feed for U6 LR access point"
     mgmt_url: ""
     poe: true
-    notes: "100 Mbps (Fast Ethernet) link to sw-hall-core."
+    notes: "100 Mbps (Fast Ethernet) link to sw-livrom."
 
   - hostname: ap-hall
     mgmt_ip: "192.168.1.161"
     mac: "8c:ed:e1:98:23:40"
     model: "Ubiquiti U7 Pro (U7PRO)"
     location: "Hallway"
-    switch: "sw-hall"
+    switch: "sw-core"
     switch_port: "7"
     speed: 1
     purpose: "WiFi access point (main)"
@@ -95,21 +95,21 @@ devices:
     mac: "ac:8b:a9:4a:27:b1"
     model: "Ubiquiti U6 Long-Range (UALR6v2)"
     location: ""
-    switch: "sw-poe-ap"
+    switch: "sw-livrom-poe"
     switch_port: ""
     speed: 1
     purpose: "WiFi access point (secondary)"
     mgmt_url: ""
     poe: true
-    notes: "OFFLINE (state 0) at 2026-08-15 scan. Fed PoE via sw-poe-ap."
+    notes: "OFFLINE (state 0) at 2026-08-15 scan. Fed PoE via sw-livrom-poe."
 
   # ══ Rack — Living Room (KWS rack) ═══════════════════════════════════════════
-  - hostname: sw-rack
+  - hostname: sw-kws
     mgmt_ip: ""
     mac: ""
     model: "Netgear GS308E (8-port managed switch)"
     location: "Living Room (KWS rack bottom)"
-    switch: "sw-hall-core"
+    switch: "sw-livrom"
     switch_port: "24"
     speed: 1
     purpose: "Rack access switch (managed)"
@@ -117,12 +117,12 @@ devices:
     poe: false
     notes: "p1 main/trunk (uplink), p3 synology, p4 pve-gpu, p5 pve-core, p6 pve-exu, p7 tp-ls108, p8 kwsdisplay, p2 empty."
 
-  - hostname: sw-rack-poe
+  - hostname: sw-kws-poe
     mgmt_ip: ""
     mac: ""
     model: "TP-Link tp-ls108 (8-port PoE switch)"
     location: "Living Room (KWS rack top)"
-    switch: "sw-rack"
+    switch: "sw-kws"
     switch_port: "7"
     speed: 1
     purpose: "PoE for rack devices (Pi / RPi-based)"
@@ -130,25 +130,25 @@ devices:
     poe: true
     notes: "p1 kws-rpi-1, p2 homeassistant, p8 uplink to GS308E. p3-7 unused."
 
-  - hostname: sw-bedroom
+  - hostname: sw-masbed
     mgmt_ip: ""
     mac: ""
     model: "yuanley ys25-0402 (4-port switch, unmanaged)"
     location: "Master Bedroom"
-    switch: "sw-hall"
+    switch: "sw-core"
     switch_port: "4"
     speed: 1
     purpose: "Bedroom access switch"
     mgmt_url: ""
     poe: false
-    notes: "p1 wall/uplink to sw-hall, p2 DESKTOP-3U0M8BH, p3 pikvm, p4 openbench."
+    notes: "p1 wall/uplink to sw-core, p2 DESKTOP-3U0M8BH, p3 pikvm, p4 openbench."
 
   - hostname: pve-core
     mgmt_ip: "192.168.1.30"
     mac: "e8:6a:64:f2:62:f9"
     model: "LCFC/Lenovo (Proxmox VE)"
     location: "Living Room (KWS rack)"
-    switch: "sw-rack"
+    switch: "sw-kws"
     switch_port: "5"
     speed: 1
     purpose: "Proxmox node (core) — LXCs/VMs incl. caddy, identity, files, operations, authentik, k3s-core"
@@ -161,7 +161,7 @@ devices:
     mac: "e8:6a:64:bf:d1:f7"
     model: "LCFC/Lenovo (Proxmox VE)"
     location: "Living Room (KWS rack)"
-    switch: "sw-rack"
+    switch: "sw-kws"
     switch_port: "6"
     speed: 1
     purpose: "Proxmox node (exu) — immich, apps, archives, paperless, stash, scrutiny, k3s-exu"
@@ -174,7 +174,7 @@ devices:
     mac: "6c:4b:90:bc:9c:61"
     model: "LiteON/Dell (Proxmox VE, GPU)"
     location: "Living Room (KWS rack)"
-    switch: "sw-rack"
+    switch: "sw-kws"
     switch_port: "4"
     speed: 1
     purpose: "Proxmox node (gpu) — jellyfin, caddy, immich/ML, sonarr/radarr/lidarr/prowlarr/qbit, k3s-gpu"
@@ -187,7 +187,7 @@ devices:
     mac: "90:09:d0:0f:ff:0d"
     model: "Synology NAS"
     location: "Living Room (KWS rack)"
-    switch: "sw-rack"
+    switch: "sw-kws"
     switch_port: "3"
     speed: 1
     purpose: "NAS / backup storage (/volume1/homelab)"
@@ -200,7 +200,7 @@ devices:
     mac: "d8:3a:dd:18:ac:bb"
     model: "Raspberry Pi"
     location: "Living Room (KWS rack)"
-    switch: "sw-rack"
+    switch: "sw-kws"
     switch_port: "8"
     speed: 1
     purpose: "Monitoring/display kiosk (Grafana dashboards)"
@@ -213,7 +213,7 @@ devices:
     mac: "d8:3a:dd:67:28:75"
     model: "Raspberry Pi"
     location: "Living Room (KWS rack)"
-    switch: "sw-rack-poe"
+    switch: "sw-kws-poe"
     switch_port: "1"
     speed: 1
     purpose: "UniFi controller / wireless management"
@@ -226,7 +226,7 @@ devices:
     mac: "dc:a6:32:8a:e4:87"
     model: "Raspberry Pi"
     location: "Living Room (KWS rack)"
-    switch: "sw-rack-poe"
+    switch: "sw-kws-poe"
     switch_port: "2"
     speed: 1
     purpose: "Home Assistant / home automation"
@@ -240,7 +240,7 @@ devices:
     mac: "30:9c:23:d9:6e:56"
     model: "MSI (Micro-Star)"
     location: "Living Room (right of KWS rack)"
-    switch: "sw-hall-core"
+    switch: "sw-livrom"
     switch_port: "23"
     speed: 1
     purpose: "LLM (Ollama) + burntv NFS media share"
@@ -253,7 +253,7 @@ devices:
     mac: "20:12:21:68:01:a7"
     model: "Bazzite desktop (workstation)"
     location: "Master Bedroom"
-    switch: "sw-bedroom"
+    switch: "sw-masbed"
     switch_port: "4"
     speed: 1
     purpose: "Management / development workstation; git authority for homelab repo"
@@ -266,7 +266,7 @@ devices:
     mac: "e8:9c:25:6d:4b:b2"
     model: "ASUSTek (Windows desktop)"
     location: "Master Bedroom"
-    switch: "sw-bedroom"
+    switch: "sw-masbed"
     switch_port: "2"
     speed: 1
     purpose: "Burney's main desktop (Windows)"
@@ -279,7 +279,7 @@ devices:
     mac: ""
     model: "(PC, hostname TheWoober)"
     location: "Back Bedroom (Kevin)"
-    switch: "sw-hall"
+    switch: "sw-core"
     switch_port: "2"
     speed: 1
     purpose: "Kevin's PC"
@@ -292,7 +292,7 @@ devices:
     mac: "a8:a1:59:a6:e2:be"
     model: "ASRock (PC)"
     location: "Front Bedroom (Jeff)"
-    switch: "sw-hall"
+    switch: "sw-core"
     switch_port: "5"
     speed: 1
     purpose: "Jeff's PC"
@@ -305,7 +305,7 @@ devices:
     mac: "e4:5f:01:e4:92:c9"
     model: "Raspberry Pi (PiKVM)"
     location: "Master Bedroom"
-    switch: "sw-bedroom"
+    switch: "sw-masbed"
     switch_port: "3"
     speed: 1
     purpose: "KVM over IP for a machine in the master bedroom"
@@ -318,7 +318,7 @@ devices:
     mac: ""
     model: "Hikvision IP camera"
     location: "Master Bedroom hallway"
-    switch: "sw-hall"
+    switch: "sw-core"
     switch_port: "3"
     speed: 0.1
     purpose: "IP camera"
@@ -331,7 +331,7 @@ devices:
     mac: ""
     model: "Android TV"
     location: "Living Room (left of metal rack)"
-    switch: "sw-hall-core"
+    switch: "sw-livrom"
     switch_port: "7"
     speed: 1
     purpose: "Living room TV / streaming"
@@ -344,7 +344,7 @@ devices:
     mac: "ec:b5:fa:06:84:9b"
     model: "Philips Hue Bridge"
     location: "Living Room (metal rack)"
-    switch: "sw-hall-core"
+    switch: "sw-livrom"
     switch_port: "3"
     speed: 0.1
     purpose: "Smart lighting bridge"
@@ -353,8 +353,8 @@ devices:
     notes: "MAC OUI EC:B5:FA = Philips Lighting. Hostname was MAC-derived 'ecb5fa06849b'."
 
 # ── Known open TODOs ─────────────────────────────────────────────────────────
-#   - sw-hall-core .115: MAC not captured.
-#   - sw-rack (GS308E): mgmt IP + MAC not yet captured (needs switch access).
+#   - sw-livrom .115: MAC not captured.
+#   - sw-kws (GS308E): mgmt IP + MAC not yet captured (needs switch access).
 #   - hikvision + android-tv MACs: not captured.
 #   - thewoober: IP + MAC unknown (offline during scans).
 #   - Transient/unassigned DHCP clients .150 and stale .198 tracked in
