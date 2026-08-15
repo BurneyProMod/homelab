@@ -25,10 +25,11 @@ classes:
 # Reserved host addresses (low end of /24, not in DHCP pool)
 reserved:
   - { ip: "192.168.1.1",   hostname: fw-opnsense,    class: networking,     assignment: static }
-  - { ip: "192.168.1.2",   hostname: "",             class: unknown,        assignment: unknown, notes: "MAC 1c:2a:a3:24:22:09 (Shenzhen HongRui Optical) — identify" }
+  - { ip: "192.168.1.2",   hostname: sw-core,        class: networking,     assignment: static, notes: "SODOLA 2.5G switch (mgmt)" }
   - { ip: "192.168.1.10",  hostname: caddy-vip,      class: networking,     assignment: static, notes: "keepalived VIP for *.burney.network (HA Caddy pair)" }
   - { ip: "192.168.1.11",  hostname: synology,       class: servers,        assignment: static }
   # 192.168.1.12 - 192.168.1.29 unused/reserved
+  # WAN reference: LUS Fiber, public IP 76.72.62.249 (from homelabable ISP node)
 
 # Hypervisors
 hypervisors:
