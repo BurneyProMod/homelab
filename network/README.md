@@ -11,6 +11,7 @@ git-tracked and reviewed like any other change.
 | `topology.yaml` | **Physical links only** — which device plugs into which switch port. No transient data. |
 | `devices.yaml` | Physical device inventory (hostname, IP, MAC, model, location, switch/port, speed, purpose, URL, PoE). |
 | `ip-addresses.yaml` | IP plan: /24 classified into classes, current assignments, DHCP pool, future ranges. |
+| `firewall.md` | OPNsense as-built: interfaces/VLANs, DHCP (dnsmasq), DNS overrides, aliases, firewall rules + port-forwards. |
 | `README.md` | This file — conventions, hostnames, labels, verification. |
 | `baseline-2026-08-15/` | Dated baseline snapshot (UniFi APs/WiFi, LLDP, ARP/DNS). |
 
