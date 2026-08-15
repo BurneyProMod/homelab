@@ -51,12 +51,16 @@ Source of truth for firewall state; physical topology lives in `topology.yaml`.
 | Proto | Port | Target | Rule |
 |-------|------|--------|------|
 | TCP | 51820 | wanip | WireGuard HomeVPN inbound |
-| TCP | 6969 | 192.168.1.114 | Fika SPT Backend |
-| UDP | 25565 | 192.168.1.114 | Fika Game |
-| TCP | 6969 | 192.168.1.101 | Tarkov Port Forward |
-| UDP | 25565 | 192.168.1.101 | Fika Game Networking |
-| TCP | ACUnity_TCP | 192.168.1.101 | AC Unity forward |
-| UDP | ACUnity_UDP | 192.168.1.101 | AC Unity forward |
+| TCP | 6969 | 192.168.1.114 | ~~Fika SPT Backend~~ **STALE** (dup of .101 set) |
+| UDP | 25565 | 192.168.1.114 | ~~Fika Game~~ **STALE** (dup of .101 set) |
+| TCP | 6969 | 192.168.1.101 | Tarkov Port Forward (TheWoober) |
+| UDP | 25565 | 192.168.1.101 | Fika Game Networking (TheWoober) |
+| TCP | ACUnity_TCP | 192.168.1.101 | AC Unity forward (TheWoober) |
+| UDP | ACUnity_UDP | 192.168.1.101 | AC Unity forward (TheWoober) |
+
+The `.114` rules are **stale duplicates** — leftover from when TheWoober (now
+`.101`) hosted the Tarkov/SPT server on a different IP. Cleanup candidates:
+delete the two `.114` forwards; verify the `.101` set is still wanted.
 
 ### Automatic (default posture)
 - Block all IPv6, default deny / state violation, port-0 blocks
@@ -65,8 +69,8 @@ Source of truth for firewall state; physical topology lives in `topology.yaml`.
 - DHCP server allows (LAN + MGMT), anti-lockout (22/80/443), outbound self
 
 ## Notes / TODOs
-- `.114` (Fika server) — physical location/port unknown, not in devices.yaml as hardware.
-- TheWoober (.101) exposes 4 inbound port sets (Tarkov/SPT/AC Unity) — review exposure.
+- **Stale port-forwards**: two rules target `192.168.1.114` (Fika SPT 6969, Fika Game 25565) — stale duplicates of the `.101` (TheWoober) set; delete them.
+- TheWoober (.101) exposes 4 inbound port sets (Tarkov/SPT/AC Unity) for Kevin's game hosting — review whether still needed.
 - 3 wide-open TEMP rules should become scoped rules once VLAN traffic is defined (goals 22–24).
 - DHCP reservations for infra devices (goal 11) not yet created.
 

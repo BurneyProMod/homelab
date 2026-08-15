@@ -116,10 +116,6 @@ wifi_mobile:
   - { ip: "192.168.1.169", hostname: kevin-s23,      mac: "6e:bb:c2:0b:e4:07" }
   - { ip: "192.168.1.132", hostname: optimus,        mac: "04:f0:21:35:a8:cb" }
 
-# Non-Proxmox servers found via firewall rules
-servers_extra:
-  - { ip: "192.168.1.114", hostname: fika-server, mac: "", notes: "Fika SPT game server (port-forwards 6969/25565) — identify" }
-
 # Transient / unidentified / stale
 transient:
   - { ip: "192.168.1.150", hostname: "", mac: "", notes: "Intermittent DHCP client; offline at scan. Appeared across multiple branches in mapper = transient/flaky. Identify." }
