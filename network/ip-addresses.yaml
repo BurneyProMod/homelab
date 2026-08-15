@@ -119,7 +119,8 @@ wifi_mobile:
 # Transient / unidentified / stale
 transient:
   - { ip: "192.168.1.150", hostname: "", mac: "", notes: "Intermittent DHCP client; offline at scan. Appeared across multiple branches in mapper = transient/flaky. Identify." }
-  - { ip: "192.168.1.101", hostname: "", mac: "a0:ad:9f:85:b7:38", notes: "ASUSTek device (wired) — identify" }
+  - { ip: "192.168.1.101", hostname: thewoober, mac: "a0:ad:9f:85:b7:38", notes: "Kevin's gaming PC (per dnsmasq hosts)" }
+  - { ip: "", hostname: hibyr4_eva, mac: "22:30:46:48:7e:03", notes: "dnsmasq host entry; locally-administered MAC — identify" }
   - { ip: "192.168.1.198", hostname: "", mac: "bc:24:11:f6:05:2a", notes: "Former/stopped Proxmox guest (stale lease); not in any current guest config" }
   - { ip: "192.168.1.3",   hostname: "", mac: "", notes: "Unresolved low-address probe target" }
   - { ip: "192.168.1.4",   hostname: "", mac: "", notes: "Unresolved" }

@@ -278,9 +278,9 @@ devices:
     notes: "Hostname DESKTOP-3U0M8BH. Was offline during cable-pull scans."
 
   - hostname: thewoober
-    mgmt_ip: ""
-    mac: ""
-    model: "(PC, hostname TheWoober)"
+    mgmt_ip: "192.168.1.101"
+    mac: "a0:ad:9f:85:b7:38"
+    model: "ASUSTek (Kevin's gaming PC)"
     location: "Back Bedroom (Kevin)"
     switch: "sw-core"
     switch_port: "2"
@@ -318,7 +318,7 @@ devices:
 
   - hostname: hikvision
     mgmt_ip: "192.168.1.145"
-    mac: ""
+    mac: "b4:a3:82:c3:a1:f6"
     model: "Hikvision IP camera"
     location: "Master Bedroom hallway"
     switch: "sw-core"
