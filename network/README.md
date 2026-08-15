@@ -27,7 +27,7 @@ everywhere (Trilium notes, labels, DNS, this repo).
 | Hostname | Device | Model | Location |
 |----------|--------|-------|----------|
 | `fw-opnsense` | router | Shenzhen Zeroone mini PC (OPNsense) | Hallway |
-| `sw-core` | access switch | SODOLA 8-port (unmanaged) | Hallway |
+| `sw-core` | distribution switch | SODOLA 8-port 2.5GbE (web-managed, +10G SFP+) | Hallway |
 | `sw-livrom` | core switch | TP-Link TL-SG1024DE | Living Room (metal rack) |
 | `sw-livrom-poe` | PoE switch | TP-Link TL-SF1005P | Living Room |
 | `sw-kws` | rack switch | Netgear GS308E | Living Room (KWS rack bottom) |

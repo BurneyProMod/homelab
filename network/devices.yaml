@@ -41,15 +41,15 @@ devices:
   - hostname: sw-core
     mgmt_ip: "192.168.1.2"
     mac: "1c:2a:a3:24:22:09"
-    model: "SODOLA 8-port switch (unmanaged, 2.5G)"
+    model: "SODOLA 8-port 2.5GbE web-managed switch (8x 2.5GBase-T + 1x 10G SFP+)"
     location: "Hallway"
     switch: ""
     switch_port: ""
     speed: 2.5
     purpose: "Wall-port distribution switch (one port per room)"
-    mgmt_url: ""
+    mgmt_url: "http://192.168.1.2"
     poe: false
-    notes: "2.5G switch (per homelabable entry). Mgmt IP .2 (outside DHCP pool)."
+    notes: "Web-managed (Web UI). SNMP: no. 10G SFP+ uplink available. Mgmt IP .2 (outside DHCP pool)."
     mgmt_url: ""
     poe: false
     notes: "p1 router, p2 Kevin bdrm, p3 MBR hallway, p4 MBR (yuanley), p5 Front bdrm (Jeff), p6 Living room (rack), p7 U7 Pro AP, p8 empty."
