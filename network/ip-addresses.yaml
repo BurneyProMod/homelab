@@ -109,7 +109,7 @@ iot_wifi:
   - { ip: "192.168.1.132", hostname: optimus,            mac: "04:f0:21:35:a8:cb", notes: "Security system panel" }
   - { ip: "192.168.1.163", hostname: ipad,               mac: "02:03:e3:ce:88:61" }
   - { ip: "192.168.1.165", hostname: "",                 mac: "88:49:2d:a2:d2:f1", notes: "Shenzhen Bilian — identify" }
-  - { ip: "192.168.1.103", hostname: wifi-1c-d6-be,      mac: "1c:d6:be:df:ca:2f", notes: "Wistron Neweb (smart TV/device) — identify" }
+  - { ip: "192.168.1.103", hostname: sony-tv,             mac: "1c:d6:be:df:ca:2f", notes: "Sony TV (Wistron Neweb WiFi module)" }
 
 # Trusted WiFi mobile clients (phones/laptops)
 wifi_mobile:
