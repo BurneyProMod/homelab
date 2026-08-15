@@ -27,7 +27,7 @@ links:
 
   # ── sw-core wall runs (one wall port per room) ────────────────────────────
   - { a: sw-core, a_port: 2,  b: thewoober,     b_port: eth, note: "Kevin's bedroom (back bedroom) wall jack" }
-  - { a: sw-core, a_port: 3,  b: hikvision,     b_port: eth, note: "Master bedroom hallway wall jack" }
+  - { a: sw-core, a_port: 3,  b: hikvision,     b_port: eth, note: "Master Bedroom Closet wall jack (dedicated)" }
   - { a: sw-core, a_port: 4,  b: sw-masbed,    b_port: 1,   note: "Master bedroom wall jack -> yuanley uplink" }
   - { a: sw-core, a_port: 5,  b: jeff-pc,       b_port: eth, note: "Front bedroom (Jeff's room) wall jack" }
   - { a: sw-core, a_port: 6,  b: sw-livrom,  b_port: "",  note: "Living room wall jack -> metal rack (TL-SG1024DE)" }

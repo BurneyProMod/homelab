@@ -320,7 +320,7 @@ devices:
     mgmt_ip: "192.168.1.145"
     mac: "b4:a3:82:c3:a1:f6"
     model: "Hikvision IP camera"
-    location: "Master Bedroom hallway"
+    location: "Master Bedroom Closet (dedicated jack)"
     switch: "sw-core"
     switch_port: "3"
     speed: 0.1
