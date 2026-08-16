@@ -44,7 +44,7 @@ services:
     labels:
       - homepage.group=Infrastructure
       - homepage.name=Scanopy
-      - homepage.href=http://192.168.1.50:60072
+      - homepage.href=http://192.168.1.65:60072
       - homepage.description=Inventory and device scanning
     ports:
       - "60072:60072"

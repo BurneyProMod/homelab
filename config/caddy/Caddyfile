@@ -83,6 +83,17 @@ rackpeek.burney.network {
 	}
 }
 
+scanopy.burney.network {
+	import tls_le_dns
+	@allowed remote_ip 192.168.1.0/24 10.8.0.0/24 127.0.0.1/8
+	handle @allowed {
+		import forward_auth 192.168.1.65:60072
+	}
+	handle {
+		respond 403
+	}
+}
+
 trilium.burney.network {
 	import tls_le_dns
 	@allowed remote_ip 192.168.1.0/24 10.8.0.0/24 127.0.0.1/8

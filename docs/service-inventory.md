@@ -22,7 +22,7 @@ Live inventory from the 2026-08-06 audit, cross-referenced with the Trilium serv
 | Vikunja | pve-exu CT 112 | vikunja.pve.lan |
 | RackPeek | pve-exu CT 112 | rackpeek.pve.lan |
 | Actual Budget | pve-exu CT 112 | actual.pve.lan |
-| Scanopy | pve-core CT 115 | 192.168.1.65:60072 |
+| Scanopy | pve-core CT 115 | 192.168.1.65:60072 / scanopy.burney.network | SSO-protected via Caddy (added 2026-08-16) |
 | OpenBao | pve-core CT 110 | openbao.pve.lan |
 | LLDAP | pve-core CT 110 | lldap.pve.lan |
 | FileBrowser Quantum | pve-core CT 114 | files.burney.network |
