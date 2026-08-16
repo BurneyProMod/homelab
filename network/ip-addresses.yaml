@@ -26,6 +26,7 @@ classes:
 reserved:
   - { ip: "192.168.1.1",   hostname: fw-opnsense,    class: networking,     assignment: static }
   - { ip: "192.168.1.2",   hostname: sw-core,        class: networking,     assignment: static, notes: "SODOLA 2.5G switch (mgmt)" }
+  - { ip: "192.168.1.150", hostname: sw-kws,         class: networking,     assignment: dhcp, notes: "Netgear GS308E mgmt (was 'transient .150'); factory reset pending" }
   - { ip: "192.168.1.10",  hostname: caddy-vip,      class: networking,     assignment: static, notes: "keepalived VIP for *.burney.network (HA Caddy pair)" }
   - { ip: "192.168.1.11",  hostname: synology,       class: servers,        assignment: static }
   # 192.168.1.12 - 192.168.1.29 unused/reserved
@@ -118,7 +119,6 @@ wifi_mobile:
 
 # Transient / unidentified / stale
 transient:
-  - { ip: "192.168.1.150", hostname: "", mac: "", notes: "Intermittent DHCP client; offline at scan. Appeared across multiple branches in mapper = transient/flaky. Identify." }
   - { ip: "", hostname: hibyr4_eva, mac: "22:30:46:48:7e:03", notes: "dnsmasq host entry; locally-administered MAC — identify" }
   - { ip: "192.168.1.198", hostname: "", mac: "bc:24:11:f6:05:2a", notes: "Former/stopped Proxmox guest (stale lease); not in any current guest config" }
   - { ip: "192.168.1.3",   hostname: "", mac: "", notes: "Unresolved low-address probe target" }

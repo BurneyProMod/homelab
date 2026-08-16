@@ -108,17 +108,17 @@ devices:
 
   # ══ Rack — Living Room (KWS rack) ═══════════════════════════════════════════
   - hostname: sw-kws
-    mgmt_ip: ""
-    mac: ""
+    mgmt_ip: "192.168.1.150"
+    mac: "bc:a5:11:c3:96:b1"
     model: "Netgear GS308E (8-port managed switch)"
     location: "Living Room (KWS rack bottom)"
     switch: "sw-livrom"
     switch_port: "24"
     speed: 1
     purpose: "Rack access switch (managed)"
-    mgmt_url: ""
+    mgmt_url: "http://192.168.1.150"
     poe: false
-    notes: "p1 main/trunk (uplink), p3 synology, p4 pve-gpu, p5 pve-core, p6 pve-exu, p7 tp-ls108, p8 kwsdisplay, p2 empty."
+    notes: "p1 main/trunk (uplink), p3 synology, p4 pve-gpu, p5 pve-core, p6 pve-exu, p7 tp-ls108, p8 kwsdisplay, p2 empty. mgmt IP .150 = the former 'transient' .150. FAC RESET PENDING (password lost); after reset expect Netgear default 192.168.168.168 + admin/password."
 
   - hostname: sw-kws-poe
     mgmt_ip: ""
